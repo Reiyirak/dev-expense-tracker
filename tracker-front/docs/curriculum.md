@@ -229,6 +229,24 @@ pnpm install
 pnpm start
 ```
 
+> **pnpm 9+ build-script policy.** Angular needs `@parcel/watcher` (file watching for `ng serve`) and `esbuild` (the bundler) to compile their native binaries. pnpm 9 doesn't run these by default for security. If `pnpm install` reports `ERR_PNPM_IGNORED_BUILDS` for `@parcel/watcher`, `esbuild`, `lmdb`, `msgpackr-extract`:
+>
+> 1. Open `tracker-front/package.json` and add:
+>    ```json
+>    "pnpm": {
+>      "onlyBuiltDependencies": [
+>        "@parcel/watcher",
+>        "esbuild",
+>        "lmdb",
+>        "msgpackr-extract"
+>      ]
+>    }
+>    ```
+> 2. Run `pnpm install` again. The four packages should build and `pnpm start` will work.
+> 3. Commit the `package.json` change so the allowlist travels with the project.
+>
+> Why not just `pnpm approve-builds <pkg>`? The non-interactive form only works during the window after install where pnpm has those packages flagged as "pending approval." Once that window closes (re-running install, switching terminals), `pnpm approve-builds <pkg>` refuses with `ERR_PNPM_APPROVE_BUILDS_UNKNOWN_PACKAGES`. Editing `package.json` directly is the reliable path.
+
 Open `http://localhost:4200` from your Windows browser — WSL2 forwards `localhost` automatically.
 
 **Why not `/mnt/c/...`?** WSL2's 9P filesystem bridge is slow for the thousands of small files in `node_modules`. With the project on Linux's ext4, `pnpm install` and `ng serve` are dramatically faster.
