@@ -35,6 +35,23 @@
 - **OS-aware snippets.** PowerShell blocks stay on Windows-only steps (initialization, push). Bash blocks stay on Linux-only steps (clone, dev). Everything else is OS-neutral.
 - **Package manager: pnpm.** All examples use `pnpm`. The `ng new` flag `--package-manager=pnpm` makes this the default for new installs; CI/scripts should use `pnpm` too.
 
+### Session management
+
+- **Fork at module boundaries, not at 80%.** Modules 1–5 each end with a self-check — that's the natural pause. A forked session stays tight (~20–30 turns) and refreshes from `docs/curriculum.md`, so it doesn't need to *remember* the whole plan.
+- **Root session keeps continuity.** Forks create children, they don't replace the parent. The root session stays for project-wide memory (folder structure, workflow rules, the future .NET plan).
+- **Maintain `docs/progress.md`** as a short running log so any forked session has instant orientation:
+  ```markdown
+  # Progress
+
+  ## Module 1 — status
+  - Lessons completed: (none yet)
+  - Next: 1.1
+  - Notes: —
+  ```
+  After forking, the new session reads both `docs/curriculum.md` and `docs/progress.md` to ground itself.
+- **Escape hatch:** if I start losing the thread — hallucinating earlier decisions, repeating recommendations, slowing down — fork immediately regardless of where you are. Module boundaries are the *default*, not a hard rule.
+- **Don't:** fork mid-lesson (kills flow), fork on every question (fragments context), or pre-empt at "exactly 80%" (the number has no meaning to the model's actual context state).
+
 ---
 
 ## Workspace Layout — `dev-expense-tracker/` monorepo
