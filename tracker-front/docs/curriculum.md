@@ -459,14 +459,14 @@ export const appConfig: ApplicationConfig = {
 **Alternative to document** → `docs/alternatives.md §1 — NgModules vs. Standalone Bootstrap`
 
 **Self-check**
-- [ ] `main.ts` uses `bootstrapApplication`
-- [ ] `app.config.ts` exports `ApplicationConfig`
-- [ ] `app.routes.ts` exports `Routes[]` with the dashboard redirect + three feature routes
-- [ ] Feature folders exist: `src/app/{expenses,dashboard,budget,shared}/`
-- [ ] Each feature folder has at least one component file (e.g., `expenses-page.component.ts`)
-- [ ] No `@NgModule` declarations anywhere in `src/`
-- [ ] No `standalone: true` in any `@Component` decorator (it's the default — don't set it)
-- [ ] Clicking nav links routes between the three placeholder pages without errors
+- [x] `main.ts` uses `bootstrapApplication`
+- [x] `app.config.ts` exports `ApplicationConfig`
+- [x] `app.routes.ts` exports `Routes[]` with the dashboard redirect + three feature routes
+- [x] Feature folders exist: `src/app/{expenses,dashboard,budget,shared}/`
+- [x] Each feature folder has at least one component file (e.g., `expenses-page.component.ts`)
+- [x] No `@NgModule` declarations anywhere in `src/`
+- [x] No `standalone: true` in any `@Component` decorator (it's the default — don't set it)
+- [x] Clicking nav links routes between the three placeholder pages without errors
 
 ---
 

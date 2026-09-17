@@ -3,10 +3,10 @@
 > Running log so any forked session can orient without re-reading the full curriculum. Update as lessons complete.
 
 ## Module 1 — Project Setup & Modern Architecture
-- **Status:** lesson 1.2 complete
-- **Lessons completed:** 1.1, 1.2
-- **Next:** 1.3
-- **Notes:** added tailwindcss with pnpm, imported tailwind to styles.css, and swaped the template in app.html
+- **Status:** lesson 1.3 complete
+- **Lessons completed:** 1.1, 1.2, 1.3
+- **Next:** 1.4
+- **Notes:** created 4 folders for app features, 3 stub components, added page components to routes.
 
 ## Module 2 — State Management with Signal Stores
 - **Status:** pending

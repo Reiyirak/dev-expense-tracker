@@ -7,18 +7,18 @@
                   focus-visible:bg-slate-100 focus-visible:text-slate-900
                   focus-visible:outline-none focus-visible:ring-2
                   focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-           routerLink="/dashboard">Dashboard</a>
+           [routerLink]="['/dashboard']">Dashboard</a>
         <a tabindex="0" class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900
                   focus-visible:bg-slate-100 focus-visible:text-slate-900
                   focus-visible:outline-none focus-visible:ring-2
                   focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-           routerLink="/expenses">Expenses</a>
+           [routerLink]="['/expenses']">Expenses</a>
 
         <a tabindex="0" class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900
                   focus-visible:bg-slate-100 focus-visible:text-slate-900
                   focus-visible:outline-none focus-visible:ring-2
                   focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-           routerLink="/budget">Budget</a>
+           [routerLink]="['/budget']">Budget</a>
       </nav>
     </div>
   </header>
@@ -27,5 +27,3 @@
     <router-outlet />
   </main>
 </div>
-
-<router-outlet />
