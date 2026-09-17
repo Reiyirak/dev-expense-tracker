@@ -22,7 +22,8 @@
 |---|---|
 | **No spoilers** | I never give you the exact TypeScript that solves the lesson's task. Generic syntax only. |
 | **Alternatives documented, not implemented** | When a concept has a legacy + modern form, the modern form goes in `src/`. The legacy form goes in `docs/alternatives.md`. |
-| **Templates are an exception** | HTML + Tailwind is given in full so you can stay focused on Angular TS, signal wiring, and form logic. |
+| **Templates are an exception** | HTML + Tailwind is given in full so you can stay focused on Angular TS, signal wiring, and form logic. Templates must pass AXE checks and meet WCAG AA minimums. |
+| **Follow `AGENTS.md` strictly** | The project's `AGENTS.md` carries Angular's official v22 best-practices. It's authoritative for: `@Service` over `@Injectable({providedIn: 'root'})`, `host` object over `@HostBinding`/`@HostListener`, `class` bindings over `ngClass`, `NgOptimizedImage` over `<img>`, inline templates for small components, no `any` (use `unknown`). When a lesson contradicts it, AGENTS.md wins. |
 | **Concepts repeat → skip explanation** | If a concept appeared earlier, a later lesson just says "Use the pattern from Lesson X to do Y." No re-teaching. |
 
 ---
@@ -457,7 +458,7 @@ export const appConfig: ApplicationConfig = {
 - Why Zone.js exists: monkey-patches async APIs to trigger global change detection
 - Cost: every `Promise.then`, `setTimeout`, XHR, event re-checks the whole tree
 - `provideZonelessChangeDetection()` — opt out of Zone, signals drive updates
-- `ChangeDetectionStrategy.OnPush` becomes the default mental model (not a separate flag needed)
+- `ChangeDetectionStrategy.OnPush` is the default in Angular v22+ — **do not set `changeDetection: ChangeDetectionStrategy.OnPush` in `@Component` decorators** (per AGENTS.md). It's the new mental model.
 - Pitfalls: rely on signals, async pipe, or explicit `markForCheck()` for non-signal async sources (timers, observables, event handlers from third-party libs)
 
 **Syntax shape (abstract)**
@@ -558,13 +559,13 @@ count.update(v => v + 1);  // → doubled() becomes 12
 
 **Concepts**
 - `inject(Token)` works in field initializers and inside constructor bodies (injection context)
-- `providedIn: 'root'` → app-singleton via root injector
+- `@Service()` → app-singleton via root injector (Angular 22+ preferred over `@Injectable({providedIn: 'root'})`)
 - Component-level `providers: []` → fresh instance per component subtree
 - `inject(EnvironmentInjector)` and `runInInjectionContext` for advanced cases (skip unless you hit them)
 
 **Syntax shape (abstract)**
 ```ts
-@Injectable({ providedIn: 'root' })
+@Service()                          // Angular 22+ — replaces @Injectable({providedIn: 'root'})
 class FooService {
   private logger = inject(Logger);
   // ...
@@ -572,7 +573,7 @@ class FooService {
 ```
 
 **What you will build**
-- Mark `ExpenseStore` with `@Injectable({ providedIn: 'root' })`.
+- Mark `ExpenseStore` with `@Service()`.
 - Replace any constructor injection with field-level `inject()` calls.
 - In a stub component, `inject(ExpenseStore)` and read `store.monthlyTotal()`.
 
@@ -594,6 +595,7 @@ class FooService {
 
 **Syntax shape (abstract)**
 ```ts
+@Service()                         // Angular 22+ — replaces @Injectable({providedIn: 'root'})
 class Store {
   private readonly _items = signal<Item[]>([]);
   readonly items = this._items.asReadonly();
