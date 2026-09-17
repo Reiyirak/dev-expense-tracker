@@ -416,9 +416,9 @@ ng new <project-name> [flags]
 ```
 
 **Self-check**
-- [ ] Tailwind utilities apply without errors
-- [ ] `<router-outlet />` renders inside the shell
-- [ ] No `*::ng-deep` or shadow-piercing hacks needed (we're not using component encapsulation overrides)
+- [x] Tailwind utilities apply without errors
+- [x] `<router-outlet />` renders inside the shell
+- [x] No `*::ng-deep` or shadow-piercing hacks needed (we're not using component encapsulation overrides)
 
 ---
 

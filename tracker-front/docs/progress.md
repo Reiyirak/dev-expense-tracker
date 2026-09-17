@@ -3,10 +3,10 @@
 > Running log so any forked session can orient without re-reading the full curriculum. Update as lessons complete.
 
 ## Module 1 — Project Setup & Modern Architecture
-- **Status:** lesson 1.1 complete
-- **Lessons completed:** 1.1
-- **Next:** 1.2
-- **Notes:** ng-version correct, angular.json and tsconfig has some differences but comes with the version, ng serve runs fine
+- **Status:** lesson 1.2 complete
+- **Lessons completed:** 1.1, 1.2
+- **Next:** 1.3
+- **Notes:** added tailwindcss with pnpm, imported tailwind to styles.css, and swaped the template in app.html
 
 ## Module 2 — State Management with Signal Stores
 - **Status:** pending
