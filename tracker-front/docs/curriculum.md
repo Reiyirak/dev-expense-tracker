@@ -302,15 +302,15 @@ This prevents CRLF surprises when editing across Windows and Linux.
 
 ## Pre-Lesson Self-Check
 
-- [ ] `node --version` ≥ 20.x on **both** Windows and Linux
-- [ ] `pnpm --version` reports a recent version on both
-- [ ] `ng version` reports 22.x
-- [ ] `ng new tracker-front` completed with `--package-manager=pnpm`
-- [ ] `docs/curriculum.md` lives inside `tracker-front/docs/`
-- [ ] Git initialized at `dev-expense-tracker/` and pushed to GitHub
-- [ ] Cloned to `~/projects/dev-expense-tracker` on Linux
-- [ ] `pnpm install` and `pnpm start` boot the dev server at `http://localhost:4200` from Linux
-- [ ] `.gitattributes` committed
+- [x] `node --version` ≥ 20.x on **both** Windows and Linux
+- [x] `pnpm --version` reports a recent version on both
+- [x] `ng version` reports 22.x
+- [x] `ng new tracker-front` completed with `--package-manager=pnpm`
+- [x] `docs/curriculum.md` lives inside `tracker-front/docs/`
+- [x] Git initialized at `dev-expense-tracker/` and pushed to GitHub
+- [x] Cloned to `~/projects/dev-expense-tracker` on Linux
+- [x] `pnpm install` and `pnpm start` boot the dev server at `http://localhost:4200` from Linux
+- [x] `.gitattributes` committed
 
 When all boxes are ticked, start Lesson 1.1.
 
