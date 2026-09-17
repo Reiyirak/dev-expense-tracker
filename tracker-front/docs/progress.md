@@ -3,10 +3,10 @@
 > Running log so any forked session can orient without re-reading the full curriculum. Update as lessons complete.
 
 ## Module 1 — Project Setup & Modern Architecture
-- **Status:** pre-lesson complete
-- **Lessons completed:** —
-- **Next:** 1.1
-- **Notes:** workspace scaffolded, pnpm + @parcel/watcher/esbuild allowlist wired, repo pushed to GitHub
+- **Status:** lesson 1.1 complete
+- **Lessons completed:** 1.1
+- **Next:** 1.2
+- **Notes:** ng-version correct, angular.json and tsconfig has some differences but comes with the version, ng serve runs fine
 
 ## Module 2 — State Management with Signal Stores
 - **Status:** pending

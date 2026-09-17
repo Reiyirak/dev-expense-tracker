@@ -349,10 +349,10 @@ ng new <project-name> [flags]
 4. Run `ng serve` and verify the default page renders with no compiler warnings.
 
 **Self-check**
-- [ ] `ng version` reports Angular 22.x
-- [ ] `tsconfig.json` has `"strict": true` and `"strictTemplates": true`
-- [ ] `ng serve` boots with no warnings
-- [ ] You can explain what each `ng new` flag you used does
+- [x] `ng version` reports Angular 22.x
+- [x] `tsconfig.json` has `"strict": true` and `"strictTemplates": true`
+- [x] `ng serve` boots with no warnings
+- [x] You can explain what each `ng new` flag you used does
 
 ---
 
