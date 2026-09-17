@@ -376,9 +376,12 @@ ng new <project-name> [flags]
 ```
 
 **What you will build**
-1. Install Tailwind v4 and wire its PostCSS plugin.
-2. Replace the generated `styles.css` content with the Tailwind import.
-3. Verify a utility class (`text-3xl font-bold`) renders in `AppComponent`'s template.
+1. Install Tailwind v4 + its PostCSS plugin (and `postcss` itself).
+2. Create `.postcssrc.json` at the workspace root wiring `@tailwindcss/postcss`.
+3. Replace `src/styles.css` content with `@import "tailwindcss";`.
+4. Replace `src/app/app.component.html` with the provided shell template below.
+5. Restart `pnpm start` (PostCSS config changes need a clean rebuild).
+6. Verify in the browser: hover state on nav links, keyboard-focus rings (Tab to see them — they're `focus-visible`, not `focus`).
 
 **Provided Template — `app.component.html` (root shell)**
 ```html
@@ -386,12 +389,21 @@ ng new <project-name> [flags]
   <header class="border-b border-slate-200 bg-white">
     <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
       <h1 class="text-xl font-semibold tracking-tight">Dev Expense Tracker</h1>
-      <nav class="flex gap-1 text-sm font-medium text-slate-600">
-        <a class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900"
+      <nav class="flex gap-1 text-sm font-medium text-slate-600" aria-label="Primary">
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900
+                  focus-visible:bg-slate-100 focus-visible:text-slate-900
+                  focus-visible:outline-none focus-visible:ring-2
+                  focus-visible:ring-slate-900 focus-visible:ring-offset-2"
            routerLink="/dashboard">Dashboard</a>
-        <a class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900"
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900
+                  focus-visible:bg-slate-100 focus-visible:text-slate-900
+                  focus-visible:outline-none focus-visible:ring-2
+                  focus-visible:ring-slate-900 focus-visible:ring-offset-2"
            routerLink="/expenses">Expenses</a>
-        <a class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900"
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100 hover:text-slate-900
+                  focus-visible:bg-slate-100 focus-visible:text-slate-900
+                  focus-visible:outline-none focus-visible:ring-2
+                  focus-visible:ring-slate-900 focus-visible:ring-offset-2"
            routerLink="/budget">Budget</a>
       </nav>
     </div>
