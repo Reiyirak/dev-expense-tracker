@@ -446,21 +446,27 @@ export const appConfig: ApplicationConfig = {
 ```
 
 **What you will build**
-1. Delete any auto-generated `AppModule`; create `app.config.ts` and `app.routes.ts`.
-2. Create the feature folders:
-   - `src/app/expenses/`
-   - `src/app/dashboard/`
-   - `src/app/budget/`
-   - `src/app/shared/`
-3. Move `AppComponent` to `src/app/` (keep it as the shell).
-4. Stub one component per feature folder (e.g., `ExpensesPageComponent`).
+1. Verify the CLI-generated files are in place: `src/main.ts` uses `bootstrapApplication`; `src/app/app.config.ts` exports `ApplicationConfig`; `src/app/app.routes.ts` exports `Routes[]`.
+2. Create the four feature folders under `src/app/`:
+   - `expenses/`
+   - `dashboard/`
+   - `budget/`
+   - `shared/`
+3. Stub one page component per feature folder using **inline templates** (per AGENTS.md's "small component" rule). Suggested names: `ExpensesPageComponent`, `DashboardPageComponent`, `BudgetPageComponent`. Do **not** set `standalone: true` in `@Component` decorators — it's the default in Angular v20+.
+4. Wire routes in `app.routes.ts`. Use eager imports for now; we'll convert to lazy `loadComponent` in Lesson 5.3. Make `dashboard` the default redirect.
+5. Verify navigation by clicking the nav links in the browser shell.
 
 **Alternative to document** → `docs/alternatives.md §1 — NgModules vs. Standalone Bootstrap`
 
 **Self-check**
 - [ ] `main.ts` uses `bootstrapApplication`
-- [ ] `app.config.ts` exists and exports `ApplicationConfig`
-- [ ] No `@NgModule` declarations remain in `src/`
+- [ ] `app.config.ts` exports `ApplicationConfig`
+- [ ] `app.routes.ts` exports `Routes[]` with the dashboard redirect + three feature routes
+- [ ] Feature folders exist: `src/app/{expenses,dashboard,budget,shared}/`
+- [ ] Each feature folder has at least one component file (e.g., `expenses-page.component.ts`)
+- [ ] No `@NgModule` declarations anywhere in `src/`
+- [ ] No `standalone: true` in any `@Component` decorator (it's the default — don't set it)
+- [ ] Clicking nav links routes between the three placeholder pages without errors
 
 ---
 
