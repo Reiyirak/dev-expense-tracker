@@ -1,6 +1,6 @@
 export type Category = 'hosting' | 'apis' | 'domains' | 'courses';
 
-export type AllowenceThreshold = 'ok' | 'warn' | 'over'
+export type AllowanceLevel = 'ok' | 'warn' | 'over';
 
 export const CATEGORIES: readonly Category[] = ['hosting', 'apis', 'domains', 'courses'];
 
@@ -12,10 +12,9 @@ export interface Expense {
   readonly note?: string;
 }
 
-
-interface Budget {
+export interface Budget {
   readonly monthlyTotal: number;
   readonly alertThreshold: number;
-  readonly perCategoryAllowences?: Partial<Record<Category, number>>;
+  readonly perCategoryAllowances?: Partial<Record<Category, number>>;
 }
 
