@@ -591,9 +591,9 @@ count.update(v => v + 1);  // → doubled() becomes 12
 **Alternative to document** → `docs/alternatives.md §3 — BehaviorSubject vs. signal()`
 
 **Self-check**
-- [ ] All three computed signals exist and recompute when inputs change
-- [ ] You can call `store.monthlyTotal()` from a template and see a number
-- [ ] `byCategory()` returns an object keyed by `Category`
+- [x] All three computed signals exist and recompute when inputs change
+- [x] You can call `store.monthlyTotal()` from a template and see a number
+- [x] `byCategory()` returns an object keyed by `Category`
 
 ---
 
