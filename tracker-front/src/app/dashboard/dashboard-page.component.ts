@@ -1,8 +1,11 @@
+import { Component, inject } from '@angular/core';
 
-import { Component } from "@angular/core";
+import { ExpenseStore } from '../shared/expense.store';
 
 @Component({
   selector: 'app-dashboard-page',
-  template: `<p class="text-slate-600">Dashboard page (placeholder)</p>`,
+  template: `<p class="text-slate-600">{{ store.monthlyTotal() }}</p>`,
 })
-export class DashboardPageComponent { }
+export class DashboardPageComponent {
+  protected store = inject(ExpenseStore);
+}

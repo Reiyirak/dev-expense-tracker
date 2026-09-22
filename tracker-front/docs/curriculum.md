@@ -620,9 +620,9 @@ class FooService {
 - In a stub component, `inject(ExpenseStore)` and read `store.monthlyTotal()`.
 
 **Self-check**
-- [ ] `ExpenseStore` is provided in root
-- [ ] No constructor-based injection anywhere in `src/`
-- [ ] `inject()` calls happen in field initializers (not inside `ngOnInit`)
+- [x] `ExpenseStore` is provided in root
+- [x] No constructor-based injection anywhere in `src/`
+- [x] `inject()` calls happen in field initializers (not inside `ngOnInit`)
 
 ---
 

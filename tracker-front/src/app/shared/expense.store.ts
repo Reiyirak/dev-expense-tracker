@@ -1,13 +1,14 @@
-import { computed, signal } from "@angular/core";
+import { computed, signal, Service } from '@angular/core';
 
-import { Expense, Budget, Category, AllowanceLevel } from "./types";
+import { Expense, Budget, Category, AllowanceLevel } from './types';
 
+@Service()
 export class ExpenseStore {
-  readonly expenses = signal<Expense[]>([])
+  readonly expenses = signal<Expense[]>([]);
   readonly budget = signal<Budget>({
     monthlyTotal: 200,
     alertThreshold: 0.8
-  })
+  });
 
   readonly monthlyTotal = computed(() => {
     // let total = 0;
@@ -24,7 +25,7 @@ export class ExpenseStore {
     return this.expenses()
       .filter((e) => e.date.startsWith(ym))
       .reduce((sum, e) => sum + e.amount, 0);
-  })
+  });
 
   readonly byCategory = computed<Record<Category, number>>(() => {
     const totals: Record<Category, number> = {
@@ -46,5 +47,5 @@ export class ExpenseStore {
     if (spent > b.monthlyTotal) return 'over';
     if (spent >= b.monthlyTotal * b.alertThreshold) return 'warn';
     return 'ok';
-  })
+  });
 }
