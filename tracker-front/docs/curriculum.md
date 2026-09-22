@@ -558,8 +558,8 @@ type Category = 'hosting' | 'apis' | 'domains' | 'courses';
 - Export a `CATEGORIES: readonly Category[]` constant.
 
 **Self-check**
-- [ ] `CATEGORIES` is `readonly` and typed `readonly Category[]`
-- [ ] `Expense` has `id`, `category: Category`, `amount: number`, `date: string` (ISO), optional `note`
+- [x] `CATEGORIES` is `readonly` and typed `readonly Category[]`
+- [x] `Expense` has `id`, `category: Category`, `amount: number`, `date: string` (ISO), optional `note`
 
 ---
 

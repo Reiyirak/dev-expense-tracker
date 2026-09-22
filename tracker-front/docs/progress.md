@@ -9,10 +9,10 @@
 - **Notes:** din't change a thing, Angular 22 is already Zoneless and onPush by default.
 
 ## Module 2 — State Management with Signal Stores
-- **Status:** pending
-- **Lessons completed:** —
-- **Next:** —
-- **Notes:** —
+- **Status:** Lesson 2.1 complete
+- **Lessons completed:** 2.1
+- **Next:** 2.2
+- **Notes:** created types file and added two interfaces, two types and a constant for an array if categories
 
 ## Module 3 — Form Handling & Data Logging
 - **Status:** pending
