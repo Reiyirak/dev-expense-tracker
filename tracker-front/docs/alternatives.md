@@ -125,6 +125,87 @@ Standalone smell:
 
 **Filled during:** Lesson 1.4 (Zoneless Change Detection)
 
+### When you'd reach for it
+
+Almost never in Angular v22+. Angular 22 ships zoneless by default — no provider, no `polyfills`, no `zone.js` import. You'd reach for Zone-retained mode only if:
+
+- A third-party library explicitly requires Zone.js (rare in 2026; most have migrated)
+- You're maintaining a pre-Angular-18 codebase
+- You're debugging a Zone-related bug in legacy code
+
+You will **not** write new code with `provideZoneChangeDetection` in Angular 22+.
+
+### The diff vs. the modern path
+
+| Concern | Zoneless (default in v22+) | Zone-retained (legacy) |
+|---|---|---|
+| Provider in `app.config.ts` | None needed | `provideZoneChangeDetection({ eventCoalescing: true })` |
+| `polyfills` in `angular.json` | None / absent | `["zone.js"]` entry |
+| Change-detection trigger | Signal reads/writes + `async` pipe + `markForCheck()` | Zone monkey-patches every async op |
+| Performance characteristic | Surgical — only changed signals re-render | Global — every async op re-checks the tree |
+| Cost of a click | Re-renders only components reading changed signals | Re-renders the entire component tree |
+
+### What it looks like in legacy code
+
+```ts
+// app.config.ts (legacy)
+import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { routes } from './app.routes';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(routes),
+  ],
+};
+```
+
+And `angular.json`:
+```json
+{
+  "projects": {
+    "tracker-front": {
+      "architect": {
+        "build": {
+          "options": {
+            "polyfills": ["zone.js"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`eventCoalescing: true` tells Zone to coalesce multiple events into a single change-detection cycle — a small optimization, not the reason to choose Zone.
+
+### Translation checklist (Zone → Zoneless)
+
+1. Remove `provideZoneChangeDetection` from `app.config.ts` providers (if present).
+2. Remove `"zone.js"` from `angular.json` polyfills (or delete the `polyfills` array if empty afterward).
+3. Audit all templates and components for Zone-dependent patterns:
+   - `subscribe(...)` not piped → wrap in `async` pipe or convert to signal via `toSignal()`
+   - `setTimeout` / `setInterval` updating view state → wrap in `effect()` or convert to signal
+   - Third-party event handlers → same
+   - `NgZone.run(...)` / `runOutsideAngular(...)` calls → drop them; signals handle this for free
+4. Anywhere the audit finds a non-signal async source that must trigger re-render, add explicit `markForCheck()` (rare; prefer signal conversion).
+
+### Quick recognition patterns
+
+Zone-retained smell (rare in 2026):
+- `provideZoneChangeDetection` in `app.config.ts`
+- `"zone.js"` in `angular.json` polyfills
+- `NgZone` injections in component/service code
+- `runOutsideAngular(...)` or `NgZone.run(...)` calls
+- Comments mentioning "trigger change detection" outside a signal context
+
+Zoneless smell (modern, default in v22+):
+- No zone-related providers in `app.config.ts`
+- No `polyfills` array (or empty)
+- Signal-driven state throughout `src/app/`
+- No `NgZone` references anywhere
+
 ## §3 — BehaviorSubject vs. `signal()`
 
 **Filled during:** Lesson 2.2 (Signal Primitives)

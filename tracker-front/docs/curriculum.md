@@ -470,38 +470,62 @@ export const appConfig: ApplicationConfig = {
 
 ---
 
-## Lesson 1.4 — Zoneless Change Detection
+## Lesson 1.4 — Zoneless Change Detection (Verify, Don't Configure)
+
+> **Angular v22+ ships zoneless by default.** Unlike earlier versions where you had to opt in with `provideZonelessChangeDetection()` and remove `zone.js` from polyfills, v22 generates a zoneless config out of the box. This lesson is **verification** — confirming what the CLI gave you — not configuration.
 
 **Concepts**
-- Why Zone.js exists: monkey-patches async APIs to trigger global change detection
-- Cost: every `Promise.then`, `setTimeout`, XHR, event re-checks the whole tree
-- `provideZonelessChangeDetection()` — opt out of Zone, signals drive updates
-- `ChangeDetectionStrategy.OnPush` is the default in Angular v22+ — **do not set `changeDetection: ChangeDetectionStrategy.OnPush` in `@Component` decorators** (per AGENTS.md). It's the new mental model.
-- Pitfalls: rely on signals, async pipe, or explicit `markForCheck()` for non-signal async sources (timers, observables, event handlers from third-party libs)
+- Why Zone.js existed historically: monkey-patched async APIs (`Promise`, `setTimeout`, XHR, `addEventListener`) to trigger global change detection
+- The cost: every async op re-checked the entire view tree, even changes unrelated to your view
+- Angular v22 default: zoneless — no provider needed, no `polyfills` array, signal reads/writes trigger re-render
+- `ChangeDetectionStrategy.OnPush` is the default in Angular v22+ — **do not set `changeDetection: ChangeDetectionStrategy.OnPush` in `@Component` decorators** (per AGENTS.md). It's automatic.
+- Pitfalls in zoneless: any state mutation outside a signal silently breaks re-render. Use `signal()`, `computed()`, `toSignal()`, `async` pipe, or explicit `markForCheck()`.
 
 **Syntax shape (abstract)**
 ```ts
-import { provideZonelessChangeDetection } from '@angular/core';
+// src/app/app.config.ts — Angular 22+ default, zoneless by default
+import { ApplicationConfig } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZonelessChangeDetection(),
+    // No provideZonelessChangeDetection() needed — it's the default in v22+
     provideRouter(routes),
   ],
 };
 ```
 
+If you ever need Zone for a third-party library:
+```ts
+import { provideZoneChangeDetection } from '@angular/core';
+
+providers: [
+  provideZoneChangeDetection({ eventCoalescing: true }),
+  provideRouter(routes),
+]
+```
+
 **What you will build**
-1. Add `provideZonelessChangeDetection()` to `appConfig`.
-2. Remove `zone.js` from `angular.json` polyfills array.
-3. Audit every template binding — any that rely on a non-signal value must be wired through a signal or `async` pipe.
+1. Read `src/app/app.config.ts` — confirm there's no `provideZoneChangeDetection` and no `zone.js` import. Zoneless should already be the default.
+2. Read `angular.json` — confirm there's no `polyfills` array (or it's empty).
+3. Audit templates for non-signal async sources:
+   ```bash
+   grep -rn 'subscribe\|setInterval\|setTimeout\|addEventListener' src/app/
+   ```
+   Should return nothing meaningful.
+4. Verify the app runs cleanly: `pnpm start`, navigate between pages, edit a placeholder, watch hot-reload. No Zone-related warnings in browser console.
+5. No `NgZone` injections anywhere in `src/`.
 
 **Alternative to document** → `docs/alternatives.md §2 — Zone.js retained mode`
 
 **Self-check**
-- [x] App still renders and updates after going zoneless
-- [x] `polyfills` in `angular.json` does **not** list `zone.js`
-- [x] No `NgZone` injections remain in feature code
+- [x] `app.config.ts` has no `provideZoneChangeDetection` and no Zone imports
+- [x] `angular.json` has no `polyfills` array (or it's empty)
+- [x] App renders and routes work as expected
+- [x] Hot-reload still fires on file save
+- [x] No Zone-related errors in browser console
+- [x] No `NgZone` injections anywhere in `src/`
 
 ---
 
