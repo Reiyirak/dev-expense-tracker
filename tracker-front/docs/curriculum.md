@@ -499,9 +499,9 @@ export const appConfig: ApplicationConfig = {
 **Alternative to document** → `docs/alternatives.md §2 — Zone.js retained mode`
 
 **Self-check**
-- [ ] App still renders and updates after going zoneless
-- [ ] `polyfills` in `angular.json` does **not** list `zone.js`
-- [ ] No `NgZone` injections remain in feature code
+- [x] App still renders and updates after going zoneless
+- [x] `polyfills` in `angular.json` does **not** list `zone.js`
+- [x] No `NgZone` injections remain in feature code
 
 ---
 

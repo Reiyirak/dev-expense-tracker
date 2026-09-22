@@ -3,10 +3,10 @@
 > Running log so any forked session can orient without re-reading the full curriculum. Update as lessons complete.
 
 ## Module 1 — Project Setup & Modern Architecture
-- **Status:** lesson 1.3 complete
-- **Lessons completed:** 1.1, 1.2, 1.3
-- **Next:** 1.4
-- **Notes:** created 4 folders for app features, 3 stub components, added page components to routes.
+- **Status:** Module 1 complete
+- **Lessons completed:** 1.1, 1.2, 1.3, 1.4
+- **Next:** Start Module 2
+- **Notes:** din't change a thing, Angular 22 is already Zoneless and onPush by default.
 
 ## Module 2 — State Management with Signal Stores
 - **Status:** pending
