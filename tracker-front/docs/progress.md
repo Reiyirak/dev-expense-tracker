@@ -9,10 +9,10 @@
 - **Notes:** din't change a thing, Angular 22 is already Zoneless and onPush by default.
 
 ## Module 2 — State Management with Signal Stores
-- **Status:** Lesson 2.3 complete
-- **Lessons completed:** 2.1, 2.2, 2.3
-- **Next:** 2.4
-- **Notes:** use dependency injection to display the signal for monthly total on the dashboard
+- **Status:** Module 2 complete
+- **Lessons completed:** 2.1, 2.2, 2.3, 2.4
+- **Next:** Start Module 3
+- **Notes:** use side effects to load and save the state of the storage
 
 ## Module 3 — Form Handling & Data Logging
 - **Status:** pending
