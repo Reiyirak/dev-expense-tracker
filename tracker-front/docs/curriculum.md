@@ -23,15 +23,18 @@
 | **No spoilers** | I never give you the exact TypeScript that solves the lesson's task. Generic syntax only. |
 | **Alternatives documented, not implemented** | When a concept has a legacy + modern form, the modern form goes in `src/`. The legacy form goes in `docs/alternatives.md`. |
 | **Templates are an exception** | HTML + Tailwind is given in full so you can stay focused on Angular TS, signal wiring, and form logic. Templates must pass AXE checks and meet WCAG AA minimums. |
-| **Follow `AGENTS.md` strictly** | The project's `AGENTS.md` carries Angular's official v22 best-practices. It's authoritative for: `@Service` over `@Injectable({providedIn: 'root'})`, `host` object over `@HostBinding`/`@HostListener`, `class` bindings over `ngClass`, `NgOptimizedImage` over `<img>`, inline templates for small components, no `any` (use `unknown`). When a lesson contradicts it, AGENTS.md wins. |
+| **Follow `AGENTS.md` strictly** | The project's `AGENTS.md` carries Angular's official v22 best-practices. It's authoritative for: `@Service` over `@Injectable({providedIn: 'root'})`, zoneless-by-default (no `provideZoneChangeDetection`, no `zone.js` polyfill), Signal Forms over Template-Driven forms, Resource APIs for async state, `host` object over `@HostBinding`/`@HostListener`, `class` bindings over `ngClass`, `NgOptimizedImage` over `<img>`, inline templates for small components, no `any` (use `unknown`). When a lesson contradicts it, AGENTS.md wins. |
 | **Concepts repeat → skip explanation** | If a concept appeared earlier, a later lesson just says "Use the pattern from Lesson X to do Y." No re-teaching. |
 
 ---
 
 ## How we'll work together
 
-- **Two environments, one canonical copy.** Windows is the bootstrap environment (where `ng new`, git init, and the first push happen). Arch Linux on WSL2 is where all development happens from Lesson 1.1 onward. Keep the canonical project on the Linux ext4 filesystem (e.g. `~/projects/dev-expense-tracker`) — *not* under `/mnt/c/...` — for filesystem-perf reasons with `node_modules`.
-- **Sync before edits.** Before starting each lesson, you'll `git pull` on Linux so your working copy matches the remote. I'll wait for your go-ahead before making file changes.
+- **Two environments, one canonical copy.** Windows is the bootstrap environment (where `ng new`, git init, and the first push happen). Arch Linux on WSL2 is where all development happens from Lesson 1.1 onward. Keep the canonical project on the Linux ext4 filesystem — *not* under `/mnt/c/...` — for filesystem-perf reasons with `node_modules`. The actual clone lives at `~/workspace/learning/frontend/angular/dev-expense-tracker` (WSL user: `ranyik`).
+- **One-sided edits, synced by git.** Never write the same change to both copies — that guarantees drift. Instead, edit on whichever side is currently active, then let git carry it: commit + push there, and `git pull` on the other. The two repos converge through the remote, not through me writing twice.
+  - **Curriculum work (lessons, `docs/`):** Windows is fine and is the usual side for it. Commit + push from Windows, then `git pull` on Linux.
+  - **App code (lessons 1.1+, `src/`):** Linux is the working side. Commit + push from Linux, then `git pull` on Windows.
+- **Sync before edits.** Before starting each lesson, `git pull` on the working side so your copy matches the remote. I'll wait for your go-ahead before making file changes.
 - **I don't make changes unilaterally.** When you ask me to "update the curriculum", "scaffold X", or "show me how to do Y", I'll propose or apply — but I won't edit files without you telling me to.
 - **OS-aware snippets.** PowerShell blocks stay on Windows-only steps (initialization, push). Bash blocks stay on Linux-only steps (clone, dev). Everything else is OS-neutral.
 - **Package manager: pnpm.** All examples use `pnpm`. The `ng new` flag `--package-manager=pnpm` makes this the default for new installs; CI/scripts should use `pnpm` too.
@@ -70,8 +73,10 @@ angular-project/
     │   │   ├── budget/
     │   │   └── shared/
     │   ├── docs/
+    │   │   ├── AGENTS.md             ← authoritative Angular v22 rules
     │   │   ├── curriculum.md
-    │   │   └── alternatives.md
+    │   │   ├── alternatives.md
+    │   │   └── progress.md
     │   └── (Angular CLI files: angular.json, package.json, …)
     └── tracker-back/             ← reserved for the .NET solution (Phase 2)
         └── README.md             ← placeholder until ASP.NET Core is scaffolded
@@ -237,8 +242,8 @@ Open a bash shell inside WSL2:
 
 ```bash
 # Keep the project on the Linux ext4 filesystem — NOT under /mnt/c/...
-mkdir -p ~/projects
-cd ~/projects
+mkdir -p ~/workspace/learning/frontend/angular
+cd ~/workspace/learning/frontend/angular
 
 git clone <your-github-url> dev-expense-tracker
 cd dev-expense-tracker/tracker-front
@@ -276,7 +281,7 @@ When you ask me to make a change, I'll show you the change on the Windows copy *
 **Sync before every edit session:**
 
 ```bash
-cd ~/projects/dev-expense-tracker
+cd ~/workspace/learning/frontend/angular/dev-expense-tracker
 git pull
 ```
 
@@ -309,7 +314,7 @@ This prevents CRLF surprises when editing across Windows and Linux.
 - [x] `ng new tracker-front` completed with `--package-manager=pnpm`
 - [x] `docs/curriculum.md` lives inside `tracker-front/docs/`
 - [x] Git initialized at `dev-expense-tracker/` and pushed to GitHub
-- [x] Cloned to `~/projects/dev-expense-tracker` on Linux
+- [x] Cloned to `~/workspace/learning/frontend/angular/dev-expense-tracker` on Linux
 - [x] `pnpm install` and `pnpm start` boot the dev server at `http://localhost:4200` from Linux
 - [x] `.gitattributes` committed
 
@@ -379,11 +384,11 @@ ng new <project-name> [flags]
 1. Install Tailwind v4 + its PostCSS plugin (and `postcss` itself).
 2. Create `.postcssrc.json` at the workspace root wiring `@tailwindcss/postcss`.
 3. Replace `src/styles.css` content with `@import "tailwindcss";`.
-4. Replace `src/app/app.component.html` with the provided shell template below.
+4. Replace `src/app/app.html` with the provided shell template below. (Angular 22's CLI scaffolds the root as `app.ts` + class `App` — **not** `app.component.ts` / `AppComponent`. Only feature components keep the `*.component.ts` naming.)
 5. Restart `pnpm start` (PostCSS config changes need a clean rebuild).
 6. Verify in the browser: hover state on nav links, keyboard-focus rings (Tab to see them — they're `focus-visible`, not `focus`).
 
-**Provided Template — `app.component.html` (root shell)**
+**Provided Template — `app.html` (root shell)**
 ```html
 <div class="min-h-screen bg-slate-50 text-slate-900">
   <header class="border-b border-slate-200 bg-white">
@@ -676,16 +681,27 @@ class Store {
 ## Lesson 3.1 — Form Paradigm Choice
 
 **Concepts**
-- **Reactive Forms** — programmatic, synchronous, type-friendly with `nonNullableFormGroup`, ideal for complex/validated forms
-- **Template-Driven Forms** — declarative via `[(ngModel)]`, simpler for trivial inputs
-- For a tool with validation rules + a store-driven submit, Reactive Forms is the right call
-- Decision is committed here: **main codebase uses Reactive Forms**
+- Angular 22 has **three** form paradigms, not two: **Template-Driven** (`[(ngModel)]`), **Reactive** (a `FormGroup` / `FormControl` tree), and **Signal Forms** (`form()` over a signal)
+- **Template-Driven Forms** — declarative via `[(ngModel)]`; state lives in the DOM and is read back on submit. Reasonable for a single trivial input; wrong the moment you need typing, cross-field rules, or programmatic access
+- **Reactive Forms** — programmatic and synchronous; an explicit control tree constructed in TypeScript with typed controls, sync validators, and async validators. The long-standing default for complex forms
+- **Signal Forms** — `form()` wraps a plain writable signal and returns a `FieldTree` where every field exposes value, validity, touched state, and errors **as signals**. Stable in Angular 22 (graduated from experimental in v21)
+- For this tool — four fields, four validation rules, a store-driven submit, and an all-signals codebase — the committed path is **Signal Forms**
+- **This is a decision lesson, not a wiring lesson.** No form is created in 3.1. The form instance and its dependency land in 3.2, once the paradigm is fixed
+
+> **Amended after first authoring.** This lesson originally told you to put `ReactiveFormsModule` in `app.config.ts` providers. That was wrong twice over: `providers` accepts injectables, not directive bundles (form directives go in the component's `imports: []` array under the standalone model), and 3.2 selects Signal Forms, which need no `ReactiveFormsModule` at all. Do not restore the old check.
 
 **Alternative to document** → `docs/alternatives.md §4 — Template-Driven Forms walk-through`
 
+**What you will build**
+- Nothing in `src/`. This lesson produces a decision you can defend plus the §4 write-up.
+- In your own words: for *this specific* form — 4 fields, 4 validators, submit feeding a signal store — why is Template-Driven the wrong tool? Name the concrete failure mode, not just "it's less type-safe."
+- Same question for Reactive Forms: what would it cost you here compared to Signal Forms, given that `ExpenseStore` is already signal-based?
+
 **Self-check**
-- [ ] `ReactiveFormsModule` is in `app.config.ts` providers
-- [ ] `FormsModule` (template-driven) is **not** imported
+- [ ] You can name all three paradigms and give a one-line reason to set aside each of the two older ones
+- [ ] `alternatives.md §4` is filled in (recognition-level only — nothing implemented in `src/`)
+- [ ] `FormsModule` is **not** imported anywhere in `src/`
+- [ ] No `expense-form.component.ts` exists yet — that is the correct state at the end of 3.1
 
 ---
 

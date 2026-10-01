@@ -15,10 +15,13 @@
 - **Notes:** use side effects to load and save the state of the storage
 
 ## Module 3 — Form Handling & Data Logging
-- **Status:** pending
-- **Lessons completed:** —
-- **Next:** —
-- **Notes:** —
+- **Status:** in progress
+- **Lessons completed:** 3.1
+- **Next:** 3.2 — Signal Forms vs Typed Reactive Forms
+- **Notes:** 3.1 is a decision lesson, no code. Committed to Signal Forms (stable in v22).
+  3.1's original self-check was wrong — put ReactiveFormsModule in app.config providers —
+  amended; ReactiveFormsModule goes in a component's imports array, and Signal Forms
+  don't need it. §4 filled. Do not restore the old check.
 
 ## Module 4 — Dashboard & Signal-Driven Communication
 - **Status:** pending
