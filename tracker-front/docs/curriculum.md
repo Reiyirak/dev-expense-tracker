@@ -660,10 +660,10 @@ class Store {
 - Add a hydration step: read from `localStorage` on construction; fall back to defaults.
 
 **Self-check**
-- [ ] Private fields use `_` prefix and are `readonly`
-- [ ] Public read views use `.asReadonly()`
-- [ ] Reloading the page restores the persisted state
-- [ ] No infinite-loop warnings in the console from the `effect`
+- [x] Private fields use `_` prefix and are `readonly`
+- [x] Public read views use `.asReadonly()`
+- [x] Reloading the page restores the persisted state
+- [x] No infinite-loop warnings in the console from the `effect`
 
 ---
 
