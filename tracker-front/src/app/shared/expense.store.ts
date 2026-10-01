@@ -78,7 +78,7 @@ export class ExpenseStore {
     };
 
     try {
-      const raw = localStorage.getItem('tracker.expense-store');
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaults;
       const parsed = JSON.parse(raw);
       return {
