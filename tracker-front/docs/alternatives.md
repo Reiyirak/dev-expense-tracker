@@ -210,6 +210,204 @@ Zoneless smell (modern, default in v22+):
 
 **Filled during:** Lesson 2.2 (Signal Primitives)
 
+### When you'd reach for it
+
+`BehaviorSubject` is the pre-signals way to expose "current value" state in Angular services. You'd reach for it only if:
+
+- You're maintaining a pre-Angular-17 codebase (signals landed in v17, became the default in v22)
+- A third-party library exposes values via `BehaviorSubject` and you need to integrate at that boundary
+- You genuinely need RxJS operators that don't have signal equivalents (e.g., `switchMap` over an HTTP stream, `debounceTime` on a search input) — and even then, only for the specific async pipeline, not for store state
+- Reading a Stack Overflow answer from 2019
+
+You will **not** write new store state with `BehaviorSubject` in 2026. You might *read* it.
+
+### The diff vs. the modern path
+
+| Concern | `signal()` (modern) | `BehaviorSubject` (legacy) |
+|---|---|---|
+| Setup | `signal<T>(initial)` | `new BehaviorSubject<T>(initial)` |
+| Read in TS | `signal()` (call like a function) | `.getValue()` or `.subscribe(v => ...)` |
+| Write | `.set(v)` or `.update(fn)` | `.next(v)` |
+| Public view | `.asReadonly()` | `.asObservable()` |
+| Template integration | `{{ value() }}` (parens) | `{{ value$ \| async }}` |
+| Subscription | None — read *is* the subscription | Manual `.subscribe(...)` + cleanup |
+| Composition | `computed(() => ...)` auto-tracks dependencies | RxJS operators (`combineLatest`, `map`, …) |
+| Cleanup | None needed | `takeUntil(destroy$)` + `ngOnDestroy` |
+| `async` pipe | Not needed for store state | Required to consume in template |
+| Multi-subscriber safety | Any number of readers, no extra cost | Each subscriber gets its own emission |
+| Change detection | Auto-notifies on `.set` / `.update` | Auto-notifies on `.next` (with async pipe) |
+
+### What it looks like in legacy code
+
+A typical pre-signals Angular service exposing state with `BehaviorSubject`:
+
+```ts
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Subject, takeUntil } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+@Injectable({ providedIn: 'root' })
+class ExpenseStore {
+  private _expenses$ = new BehaviorSubject<Expense[]>([]);
+  private _budget$ = new BehaviorSubject<Budget>({
+    monthlyTotal: 200,
+    alertThreshold: 0.8,
+  });
+
+  readonly expenses$ = this._expenses$.asObservable();
+  readonly budget$ = this._budget$.asObservable();
+
+  readonly monthlyTotal$ = this._expenses$.pipe(
+    map((list) => list.reduce((s, e) => s + e.amount, 0)),
+  );
+
+  addExpense(input: Omit<Expense, 'id'>) {
+    this._expenses$.next([
+      ...this._expenses$.getValue(),
+      { ...input, id: crypto.randomUUID() },
+    ]);
+  }
+
+  setBudget(budget: Budget) {
+    this._budget$.next(budget);
+  }
+}
+```
+
+Component consumption:
+
+```ts
+@Component({...})
+class ExpensesPageComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
+  expenses: Expense[] = [];
+
+  constructor(private store: ExpenseStore) {}
+
+  ngOnInit() {
+    this.store.expenses$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((list) => (this.expenses = list));
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+}
+```
+
+Template:
+
+```html
+<ul>
+  <li *ngFor="let e of expenses; trackBy: trackById">{{ e.amount }}</li>
+</ul>
+<p>{{ (store.monthlyTotal$ | async) | currency }}</p>
+```
+
+A lot of ceremony: one subscription, an `async` pipe, a `takeUntil` destroy pattern, `*ngFor` instead of `@for`, and a manual `trackBy`.
+
+### What it looks like in modern code
+
+Same store, signal-based:
+
+```ts
+import { Service, computed, signal } from '@angular/core';
+
+@Service()
+class ExpenseStore {
+  private readonly _expenses = signal<Expense[]>([]);
+  private readonly _budget = signal<Budget>({
+    monthlyTotal: 200,
+    alertThreshold: 0.8,
+  });
+
+  readonly expenses = this._expenses.asReadonly();
+  readonly budget = this._budget.asReadonly();
+
+  readonly monthlyTotal = computed(() =>
+    this._expenses().reduce((s, e) => s + e.amount, 0),
+  );
+
+  addExpense(input: Omit<Expense, 'id'>) {
+    this._expenses.update((list) => [
+      ...list,
+      { ...input, id: crypto.randomUUID() },
+    ]);
+  }
+
+  setBudget(budget: Budget) {
+    this._budget.set(budget);
+  }
+}
+```
+
+Component consumption:
+
+```ts
+@Component({...})
+class ExpensesPageComponent {
+  protected store = inject(ExpenseStore);
+}
+```
+
+Template:
+
+```html
+<ul>
+  @for (e of store.expenses(); track e.id) {
+    <li>{{ e.amount }}</li>
+  }
+</ul>
+<p>{{ store.monthlyTotal() | currency }}</p>
+```
+
+No subscriptions, no `async` pipe, no `takeUntil`, no `*ngFor`. The `async` pipe is gone because `store.monthlyTotal()` already returns the resolved value.
+
+### Translation checklist (BehaviorSubject → signal)
+
+1. `new BehaviorSubject<T>(initial)` → `signal<T>(initial)`.
+2. `subject$.asObservable()` → drop entirely. Signals are read directly. Use `.asReadonly()` only when you need a typed read-only view to expose to consumers.
+3. `subject$.next(v)` → `signal.set(v)`. If you were transforming before storing, use `signal.update(fn)` instead.
+4. `subject$.getValue()` → `signal()` (call the signal as a function).
+5. `.subscribe(...)` in components → delete. Read the signal in the template directly.
+6. `takeUntil(destroy$)` + `ngOnDestroy` cleanup → delete. Signals don't need teardown.
+7. `combineLatest([a$, b$]).pipe(map(...))` for derived state → `computed(() => ...)` reading both signals.
+8. `subject$.pipe(map(...))` for transformed state → `computed(() => ...)`.
+9. `| async` in templates → drop. Read the signal with parens: `value()`.
+10. `*ngFor="let x of xs$ | async"` → `@for (x of xs(); track x.id)`.
+11. `trackBy: trackById` → `track x.id` (mandatory in `@for`).
+12. If the only async work that remains is genuine RxJS (e.g., `http.get(...).pipe(retry(3))`), keep that pipeline and convert to a signal with `toSignal()` at the boundary — don't pull RxJS into the store.
+
+### Quick recognition patterns
+
+`BehaviorSubject` smell (when scanning a legacy codebase):
+
+- `import { BehaviorSubject, Subject, ReplaySubject } from 'rxjs'`
+- `private _x$ = new BehaviorSubject<T>(...)` in a service
+- `.asObservable()` calls
+- `.next(...)` for state writes
+- `.subscribe(...)` in components
+- `| async` in templates
+- `takeUntil(destroy$)` + `ngOnDestroy` patterns
+- `combineLatest`, `switchMap`, `mergeMap` used for derived *state* (not for genuine async work like HTTP)
+- `*ngFor`, `*ngIf` instead of `@for`, `@if`
+- Manual `trackBy` functions
+
+Signal smell (modern, default in v22+):
+
+- `signal(...)` for writable state
+- `computed(...)` for derived state
+- `.set(...)` / `.update(...)` for writes
+- `.asReadonly()` for read-only views
+- `signal()` (parens) to read in templates and TS
+- No `| async` for store state
+- No `.subscribe()` in components
+- No `ngOnDestroy` for subscription cleanup
+- Native control flow (`@if`, `@for`, `@switch`)
+- `track` is the new `trackBy`
+
 ## §4 — Template-Driven Forms walk-through
 
 **Filled during:** Lesson 3.1 (Form Paradigm Choice)
