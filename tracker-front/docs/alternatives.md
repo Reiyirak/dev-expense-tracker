@@ -19,7 +19,7 @@ You will **not** write new code with NgModules in 2026. You might *read* it.
 
 | Concern | Standalone (modern) | NgModule (legacy) |
 |---|---|---|
-| Bootstrap | `bootstrapApplication(AppComponent, appConfig)` in `main.ts` | `platformBrowserDynamic().bootstrapModule(AppModule)` in `main.ts` |
+| Bootstrap | `bootstrapApplication(App, appConfig)` in `main.ts` (Angular 22's root class is `App` from `app.ts`, not `AppComponent`) | `platformBrowserDynamic().bootstrapModule(AppModule)` in `main.ts` |
 | Root config | `ApplicationConfig` exported from `app.config.ts` | `@NgModule({...})` class exported from `app.module.ts` |
 | Routing | `provideRouter(routes)` in `app.config.ts` | `RouterModule.forRoot(routes)` imported in `AppModule.imports` |
 | Component deps | `@Component({ imports: [RouterOutlet, RouterLink] })` | Component has no `imports` array; deps come from the module's `imports` |
@@ -51,7 +51,7 @@ Five arrays. Standalone collapses most of these down into component-level `impor
 
 ```ts
 // main.ts
-bootstrapApplication(AppComponent, appConfig);
+bootstrapApplication(App, appConfig);
 
 // app.config.ts
 export const appConfig: ApplicationConfig = {
@@ -99,9 +99,9 @@ export class AppComponent {}
 ### Translation checklist (NgModule → Standalone)
 
 1. Move `providers` from `AppModule` into `app.config.ts` `providers`. Convert `RouterModule.forRoot(routes)` → `provideRouter(routes)`.
-2. Move each component from `declarations` to its own `@Component({ imports: [...] })` array. Add `CommonModule` (or specific directives) into `imports` if the template uses `*ngIf`, `*ngFor`, `*ngFor`, etc.
+2. Move each component from `declarations` to its own `@Component({ imports: [...] })` array. Add `CommonModule` (or specific directives) into `imports` if the template uses `*ngIf`, `*ngFor`, `ngClass`, etc.
 3. Move each pipe from `declarations` to its own `@Pipe({...})` decorator and import into consuming components.
-4. Drop `bootstrap` — standalone has no equivalent; `bootstrapApplication(AppComponent, ...)` does the job.
+4. Drop `bootstrap` — standalone has no equivalent; `bootstrapApplication(App, ...)` does the job.
 5. Delete `AppModule`.
 
 ### Quick recognition patterns
@@ -435,24 +435,24 @@ You will **not** write the expense form this way. It has four fields, four valid
 | Reactive updates | Free — it is a signal | Needs `valueChanges` (RxJS) or a manual re-read |
 | Adding a validator later | Edit the schema | `setValidators()` + `updateValueAndValidity()` |
 | Async validation | A `validate()` returning a Promise | `AsyncValidatorFn` returning an Observable |
-| Reset | `form.reset()` | `form.resetForm()`, or clearing fields by hand |
+| Reset | `form().reset()` (state only) + write the model signal (values) | `form.resetForm()`, or clearing fields by hand |
 | Accessibility state | `touched()` / `errors()` are signals | Hidden behind the `NgForm` directive instance |
 | Unit testing | Pure functions over signals | Needs `TestBed` + DOM interaction to be meaningful |
 
 ### What it looks like in legacy code
 
 ```ts
-// expense-form.component.ts (template-driven)
+// expenses-form.component.ts (template-driven)
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Category } from '../shared/types';
 
 @Component({
-  selector: 'app-expense-form',
+  selector: 'app-expenses-form',
   imports: [FormsModule],
-  templateUrl: './expense-form.component.html',
+  templateUrl: './expenses-form.component.html',
 })
-export class ExpenseFormComponent {
+export class ExpensesFormComponent {
   amount: number | undefined;
   category: Category | undefined;
   date = '';
@@ -483,16 +483,16 @@ Notice what the class cannot do. It cannot answer *"is the amount valid right no
 ### What it looks like in modern code
 
 ```ts
-// expense-form.component.ts (Signal Forms)
+// expenses-form.component.ts (Signal Forms)
 import { Component, signal } from '@angular/core';
 import { form, schema, validate } from '@angular/forms/signals';
 import { Category } from '../shared/types';
 
 @Component({
-  selector: 'app-expense-form',
-  templateUrl: './expense-form.component.html',
+  selector: 'app-expenses-form',
+  templateUrl: './expenses-form.component.html',
 })
-export class ExpenseFormComponent {
+export class ExpensesFormComponent {
   private readonly model = signal({
     amount: 0,
     category: '' as Category,
@@ -515,12 +515,12 @@ Every question the class could not answer becomes a signal read — `expenseForm
 1. Delete the `FormsModule` import from the component's `imports: []`.
 2. Move every `[(ngModel)]="x.y"` target into one plain writable `signal<{...}>({...})`. That signal's shape *is* the form model.
 3. `new FormGroup({...})` / `new FormControl(...)` → `form(modelSignal)`. No `FormBuilder`.
-4. `Validators` arrays → `schema(...)` + `validate(...)` predicates. The `{ key: value }` error-object shape is unchanged, so your error-mapping code survives.
+4. `Validators` arrays → `schema(...)` + `validate(...)` rules. The error shape is **not** identical: Signal Forms errors are `{ kind: 'required' | 'min' | ... }` objects read via `field.getError(kind)` / `field.errors()`, so error-mapping code has to be rewritten.
 5. `required` / `min` / `max` / `pattern` / `maxlength` HTML attributes → real validators. Signal Forms do not rely on browser constraint validation — keep `novalidate` and validate explicitly.
 6. `this.expense.amount` in TypeScript → `expenseForm.amount().value()`.
 7. `formGroup.invalid` → `form().invalid()`.
 8. `#f="ngForm"` template reference variables → delete. Reach the form through the class field instead.
-9. `form.resetForm()` → `form.reset()`.
+9. `form.resetForm()` → **two** calls: `form().reset()` clears `touched`/`dirty` only, and you must also write the model signal yourself to clear the values.
 10. Anything reading `valueChanges` → read the field signal directly. Drop the RxJS import.
 11. Untyped class properties → inferred types. Delete the `| undefined` annotations; the compiler now proves the shape.
 12. If one field genuinely cannot move (an NgModel-only third-party input), keep that single field as `ngModel` and bridge it into the model signal with one write. Do not let one legacy field dictate the architecture of the whole form.

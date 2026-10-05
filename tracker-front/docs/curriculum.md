@@ -49,7 +49,7 @@ Each lesson in the chat follows the same shape, in this order:
 **Code fences use this convention:**
 
 ````markdown
-`src/app/expenses/expense-form/expense-form.ts` — *(new file)*
+`src/app/expenses/expenses-form.component.ts` — *(new file)*
 
 ```ts
 // full file contents
@@ -467,7 +467,7 @@ ng new <project-name> [flags]
 
 **Concepts**
 - Standalone components are now the default — no `standalone: true` flag needed
-- `bootstrapApplication(AppComponent, appConfig)` replaces `platformBrowserDynamic().bootstrapModule(AppModule)`
+- `bootstrapApplication(App, appConfig)` replaces `platformBrowserDynamic().bootstrapModule(AppModule)` — note the root class is `App` from `app.ts` in Angular 22, **not** `AppComponent` (see Lesson 1.2 step 4)
 - `appConfig: ApplicationConfig = { providers: [...] }` collects router, change detection, etc.
 - Feature-folder layout convention: each feature owns its components, routes, store, types
 - File-naming convention: `*.component.ts`, `*.service.ts`, `*.store.ts`, `*.types.ts`
@@ -475,7 +475,7 @@ ng new <project-name> [flags]
 **Syntax shape (abstract)**
 ```ts
 // main.ts
-bootstrapApplication(AppComponent, appConfig);
+bootstrapApplication(App, appConfig);
 
 // app.config.ts
 export const appConfig: ApplicationConfig = {
@@ -720,7 +720,7 @@ class Store {
 - Angular 22 has **three** form paradigms, not two: **Template-Driven** (`[(ngModel)]`), **Reactive** (a `FormGroup` / `FormControl` tree), and **Signal Forms** (`form()` over a signal)
 - **Template-Driven Forms** — declarative via `[(ngModel)]`; state lives in the DOM and is read back on submit. Reasonable for a single trivial input; wrong the moment you need typing, cross-field rules, or programmatic access
 - **Reactive Forms** — programmatic and synchronous; an explicit control tree constructed in TypeScript with typed controls, sync validators, and async validators. The long-standing default for complex forms
-- **Signal Forms** — `form()` wraps a plain writable signal and returns a `FieldTree` where every field exposes value, validity, touched state, and errors **as signals**. Stable in Angular 22 (graduated from experimental in v21)
+- **Signal Forms** — `form()` wraps a plain writable signal and returns a `FieldTree` where every field exposes value, validity, touched state, and errors **as signals**. Stable in Angular 22: `form`, `FieldTree`, `FieldState`, `FormField`, `FormRoot`, and `schema` are all `@publicApi 22.0` in the type definitions
 - For this tool — four fields, four validation rules, a store-driven submit, and an all-signals codebase — the committed path is **Signal Forms**
 - **This is a decision lesson, not a wiring lesson.** No form is created in 3.1. The form instance and its dependency land in 3.2, once the paradigm is fixed
 
@@ -737,7 +737,9 @@ class Store {
 - [ ] You can name all three paradigms and give a one-line reason to set aside each of the two older ones
 - [ ] `alternatives.md §4` is filled in (recognition-level only — nothing implemented in `src/`)
 - [ ] `FormsModule` is **not** imported anywhere in `src/`
-- [ ] No `expense-form.component.ts` exists yet — that is the correct state at the end of 3.1
+- [ ] No `expenses-form.component.ts` exists yet — that is the correct state at the end of 3.1
+
+> **Reconciled with the repo.** The stub the user started early lives at `src/app/expenses/expenses-form.component.ts` and the class is `ExpensesFormComponent` (plural "expenses", matching the `expenses/` feature folder and the `ExpensesPageComponent` next to it). Lessons 3.2 – 3.4 use that name and path. The curriculum's older `expense-form.component.ts` / `ExpenseFormComponent` spelling is retired — don't restore it.
 
 ---
 
@@ -746,24 +748,40 @@ class Store {
 > **First lesson in guided-code mode.** Delivered in chat as a full walkthrough + paste-ready code blocks. You create and edit the files yourself; the agent does not touch `src/`.
 
 **Concepts**
-- **Signal Forms** (Angular 22, experimental → stable): `form()`, `Field`, schema-based validation, native signal integration
+- **Signal Forms** (stable in 22, `@publicApi 22.0`): `form()`, `FieldTree`, `FieldState`, the `FormField` directive, the `FormRoot` directive, schema-based validation, native signal integration
 - **Typed Reactive Forms**: `FormGroup<{ amount: FormControl<number | null> }>`, `nonNullable` variants, validators as pure functions
 - For an Angular 22 curriculum that wants modern signals end-to-end, **Signal Forms** is the recommended path
 - Decision: **main codebase uses Signal Forms**; typed Reactive Forms lives in `docs/alternatives.md`
 
-**Syntax shape (abstract)**
+**The real 22.x API shape** (verified against `@angular/forms` 22.1.6 — the installed version)
 ```ts
-// Signal Forms (modern)
-const expenseForm = form({
-  amount: 0,
-  category: '' as Category,
-  date: '',
-  note: '',
-});
+import { Component, signal } from '@angular/core';
+import { form, FormField, FormRoot } from '@angular/forms/signals';
+
+@Component({
+  selector: 'app-expenses-form',
+  imports: [FormField, FormRoot],
+  template: `
+    <form [formRoot]="expenseForm">
+      <input type="number" [formField]="expenseForm.amount" />
+      <input type="date"  [formField]="expenseForm.date" />
+    </form>
+  `,
+})
+export class ExpensesFormComponent {
+  private readonly model = signal({ amount: 0, date: '', note: '' });
+  protected readonly expenseForm = form(this.model);
+}
 ```
 
+- `form()` takes a **`WritableSignal`**, never a bare object. The three overloads in 22.1.6 are `form(model)`, `form(model, schemaOrOptions)`, `form(model, schema, options)`. The model signal stays the single source of truth — writing `expenseForm.amount().value.set(5)` also updates `model()`.
+- **Binding is done by directive, not by accessor.** `[formField]="expenseForm.amount"` hands a `FieldState` to an element; the directive wires value in/out both ways and tracks touched/dirty. The property path is the accessor, but you never call it in the template to bind a value.
+- **`FormRoot` is optional and only about the `<form>` element.** It sets `novalidate`, prevents the default submit, and calls `submit()` on the tree when submission options are configured. If you skip it you must handle `(submit)` yourself and keep `novalidate` by hand.
+- Read state through the field: `expenseForm.amount().value()`, `.errors()`, `.touched()`, `.valid()`, `.getError('required')`, and on the root `expenseForm().value()`, `.valid()`, `.errors()`.
+- `FormField` must be in the component's `imports`. `FormRoot` only if you use `[formRoot]`.
+
+**Typed Reactive Forms (legacy) shape, for contrast only**
 ```ts
-// Typed Reactive Forms (legacy)
 const expenseForm = new FormGroup({
   amount: new FormControl(0, { nonNullable: true, validators: [Validators.required] }),
   category: new FormControl<Category>('hosting', { nonNullable: true }),
@@ -773,13 +791,16 @@ const expenseForm = new FormGroup({
 **Alternative to document** → `docs/alternatives.md §5 — Typed Reactive Forms walk-through`
 
 **What you will build**
-- In `ExpenseFormComponent`, create the form instance at component level.
-- Bind inputs through `form.name` signal accessors.
+- In `ExpensesFormComponent` (`src/app/expenses/expenses-form.component.ts`), keep the model signal and create the form instance once at component level.
+- Import `FormField` (+ `FormRoot` if you keep `[formRoot]`) in the component's `imports`.
+- Bind all four controls with `[formField]`, not `[value]` / `(input)` pairs and not bare `name` attributes.
 - Write the submit handler. (Curriculum text predates guided-code mode; the delivered lesson includes the full handler code — scope is unchanged.)
 
 **Self-check**
+- [ ] `form()` receives the model signal, not an object literal
+- [ ] Every control is bound with `[formField]`
 - [ ] Form is created once (not inside a method)
-- [ ] Field accessors are reactive in the template
+- [ ] Field state reads are reactive in the template
 - [ ] The agent did not edit any file in `src/` — you did all the writing
 
 ---
@@ -787,31 +808,63 @@ const expenseForm = new FormGroup({
 ## Lesson 3.3 — Validation Patterns
 
 **Concepts**
-- Built-ins: `required`, `min`, `max`, `pattern`, `email`, `minLength`, `maxLength`
-- Custom validators: function returning `null` or `{ key: value }`
-- Cross-field validators at the group level
-- With Signal Forms: schema-driven validators via `schema(...)` + `validate(...)`
-- Display errors via computed signals that read the field's error state
+- Built-in rule helpers in `@angular/forms/signals`: `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `email`, `minDate`, `maxDate` — each takes a schema path, not a control
+- `schema((path) => { ... })` collects rules; `apply(path, schema)` applies a reusable `Schema` to a subtree; `validate(path, fn)` writes a custom rule
+- Custom rule shape: a predicate returning `true` for valid, or an error object `{ kind: 'positive', ... }` for invalid. **Not** the Reactive-Forms `null` / `{ key: value }` contract
+- Read errors with `field.getError('min')` (first error of that kind) or `field.errors()` (all of them); `field.valid()`, `field.touched()`, `field.markAsTouched()`
+- Cross-field rules: `validate(path, fn)` reading sibling paths, or `validateTree` for a whole subtree
+- Async rules: `validateAsync(path, ...)`; HTTP-backed rules: `validateHttp(path, ...)`
+- Signal Forms don't rely on browser constraint validation — keep `novalidate` and validate in TS
 
-**Syntax shape (abstract)**
+
+**Syntax shape (the real 22.x form)**
 ```ts
-// Validator factory
-function positiveAmount(c: AbstractControl) {
-  return c.value > 0 ? null : { positive: true };
-}
+// Schema-based rules, built once at component level
+private readonly model = signal({ amount: 0, category: '' as Category, date: '', note: '' });
+
+protected readonly expenseForm = form(
+  this.model,
+  schema((path) => {
+    required(path.amount);
+    min(path.amount, 0.01);
+    required(path.category);
+    required(path.date);
+    maxLength(path.note, 200);
+
+    // custom rule: return true when valid, or an error object when not
+    validate(path.amount, ({ value }) => value > 0 || { kind: 'positive' });
+  }),
+);
+```
+
+```ts
+// reading state in TS or a template
+const amount = this.expenseForm.amount();
+amount().value();          // 0
+amount().valid();          // boolean signal
+amount().touched();        // boolean signal
+amount().errors();         // all errors
+amount().getError('min');  // first error of that kind, or undefined
+
+// invalid + touched is what "show the error" usually means
+readonly showAmountError = computed(
+  () => this.expenseForm.amount().touched() && !this.expenseForm.amount().valid(),
+);
 ```
 
 **What you will build**
-- Apply validators: required amount, positive number, valid category, valid date.
-- Add a `note` field with max length 200.
-- Show inline error text per field using Tailwind classes you pick.
+- Apply rules: required + positive amount, valid category, valid date.
+- Cap `note` at 200 characters with `maxLength(path.note, 200)`.
+- Show inline error text per field using Tailwind classes you pick, gated on `touched()` (or on a submit attempt).
 
-**Provided Template — `expense-form.component.html`**
+**Provided Template — `src/app/expenses/expenses-form.component.html`**
+
+> Bind every control with `[formField]="expenseForm.<field>"` — never `[value]` / `(input)` pairs, and no bare `name` attributes. `[formRoot]` on the `<form>` sets `novalidate` for you and stops the browser's default submit, so drop the manual `novalidate` and the `(submit)` handler. Error text and error styling are bound by you from the field signals.
+
 ```html
 <form
+  [formRoot]="expenseForm"
   class="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
-  (submit)="onSubmit($event)"
-  novalidate
 >
   <header>
     <h2 class="text-lg font-semibold">Log a new expense</h2>
@@ -827,19 +880,21 @@ function positiveAmount(c: AbstractControl) {
         inputmode="decimal"
         step="0.01"
         min="0"
-        name="amount"
+        [formField]="expenseForm.amount"
+        [class.border-red-500]="showAmountError()"
         class="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
       />
-      <!-- You bind [value] / [class.border-red-500] / error text via signals -->
-      <p class="mt-1 hidden text-xs text-red-600">Amount must be greater than 0.</p>
+      @if (showAmountError()) {
+        <p class="mt-1 text-xs text-red-600">Amount must be greater than 0.</p>
+      }
     </label>
 
     <!-- Category -->
     <label class="block text-sm">
       <span class="mb-1 block font-medium text-slate-700">Category</span>
       <select
-        name="category"
+        [formField]="expenseForm.category"
         class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm
                focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
       >
@@ -856,7 +911,7 @@ function positiveAmount(c: AbstractControl) {
       <span class="mb-1 block font-medium text-slate-700">Date</span>
       <input
         type="date"
-        name="date"
+        [formField]="expenseForm.date"
         class="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
       />
@@ -867,9 +922,8 @@ function positiveAmount(c: AbstractControl) {
       <span class="mb-1 block font-medium text-slate-700">Note (optional)</span>
       <input
         type="text"
-        name="note"
-        maxlength="200"
         placeholder="e.g. Annual Vercel renewal"
+        [formField]="expenseForm.note"
         class="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
       />
@@ -880,6 +934,7 @@ function positiveAmount(c: AbstractControl) {
     <p class="text-xs text-slate-500">All amounts in USD. You can edit categories later.</p>
     <button
       type="submit"
+      [disabled]="expenseForm().submitting()"
       class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white
              hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900
              focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -890,7 +945,14 @@ function positiveAmount(c: AbstractControl) {
 </form>
 ```
 
+Notes on the deltas from the old version of this template:
+- `name="amount"` etc. are gone — `[formField]` is the binding, and it supplies the generated field name.
+- `maxlength="200"` is gone — that's a rule now (`maxLength(path.note, 200)` in 3.3), not an HTML attribute.
+- `<p class="... hidden ...">` became `@if`, because a `hidden` class plus a signal binding is a trap; the class binding on the input is `[class.border-red-500]="showAmountError()"`.
+- `imports: [FormField, FormRoot]` must be on the component.
+
 **Self-check**
+- [ ] No `(submit)` handler and no manual `novalidate` — `[formRoot]` owns both
 - [ ] Submitting with `amount = 0` shows the amount error
 - [ ] Submitting with empty `category` is blocked
 - [ ] Errors clear when the field becomes valid (don't rely on `(blur)` alone)
@@ -903,28 +965,47 @@ function positiveAmount(c: AbstractControl) {
 - Submit handler signature: takes a typed payload, no `any`
 - Mutator methods on the store accept validated input, not raw form values
 - ID generation: `crypto.randomUUID()` (built-in), or `Date.now()` + random suffix
-- Reset the form on successful submit; preserve values on validation failure
+- Two ways to reset, and you need **both**: `FieldState.reset()` clears `touched`/`dirty` **without touching the data** (the 22.x docs are explicit: "this does not change the data model, which can be reset directly if desired"), so the model signal must be written separately
+- Preserve values on validation failure — reset only on success
 - Use `untracked()` when reading store state inside an `effect` that also writes to it
 
-**Syntax shape (abstract)**
+**Syntax shape (the real 22.x flow)**
 ```ts
-onSubmit(payload: ExpenseDraft) {
-  const expense: Expense = { ...payload, id: crypto.randomUUID() };
-  this.store.addExpense(expense);
-  this.form.reset();
+type ExpenseDraft = Omit<Expense, 'id'>;
+
+private readonly store = inject(ExpenseStore);
+private readonly model = signal<ExpenseDraft>({
+  amount: 0, category: 'hosting', date: '', note: '',
+});
+protected readonly expenseForm = form(this.model, expenseSchema);
+
+protected onSubmit(): void {
+  if (this.expenseForm().invalid()) {
+    this.expenseForm().markAsTouched();   // reveal the errors, keep the values
+    return;
+  }
+
+  this.store.addExpense(this.expenseForm().value());  // store mints the id
+
+  this.expenseForm().reset();   // clears touched/dirty
+  this.model.set(emptyDraft);   // clears the values — reset() will not do this
 }
 ```
 
+`ExpenseStore.addExpense(input: Omit<Expense, 'id'>)` already calls `crypto.randomUUID()` internally, so the component must not generate ids.
+
 **What you will build**
-- Wire the form's submit handler to `ExpenseStore.addExpense()`.
-- Generate a stable `id` per new entry.
-- Reset the form on success; do **not** reset on validation failure.
+- Wire the form's submit to `ExpenseStore.addExpense()`, passing the form's value signal.
+- Let the store own id generation (it already does).
+- On success call both resets: `expenseForm().reset()` **and** `model.set(emptyDraft)`. On failure, neither.
 - Confirm the new row appears in the dashboard list (built in Module 4).
 
 **Self-check**
 - [ ] New entries appear in the dashboard without a manual refresh
-- [ ] Form clears after successful submit
+- [ ] Form clears after successful submit (both inputs **and** error styling)
+- [ ] Submitting an invalid form keeps what you typed
 - [ ] No `any` types in the submit path
+- [ ] No duplicate `crypto.randomUUID()` in the component
 
 ---
 
@@ -1027,8 +1108,9 @@ const colorFor = (level: 'ok' | 'warn' | 'over') => ({
 ```
 
 **What you will build**
-- `AlertBannerComponent` reads `level()` input, applies color tiers at 60% / 90% / 100% of budget.
+- `AlertBannerComponent` reads the `level()` input and maps it to a color tier. The tiers themselves come from the store's `alertLevel()`: `'warn'` at `budget().alertThreshold` (80% by default), `'over'` past `budget().monthlyTotal`. Don't hard-code 60/90 here — the store owns the policy, the component owns the paint.
 - `MetricCardComponent` shows a progress bar whose color shifts by `alertLevel()`.
+- Add one computed to the dashboard component for the "Remaining" figure and one for the threshold percentage. `ExpenseStore` as built in Module 2 has **no** `remainingBudget()` and **no** `alertThresholdPct()` — don't call methods that don't exist; derive them where they're used.
 - All color classes appear in your templates or `@source` directives so Tailwind doesn't purge them.
 
 **Provided Template — `dashboard.component.html`**
@@ -1041,7 +1123,7 @@ const colorFor = (level: 'ok' | 'warn' | 'over') => ({
     </div>
     <p class="text-sm text-slate-500">
       Threshold alert at
-      <span class="font-medium text-slate-900">{{ store.alertThresholdPct() }}%</span>
+      <span class="font-medium text-slate-900">{{ thresholdPct() }}%</span>
     </p>
   </header>
 
@@ -1057,11 +1139,11 @@ const colorFor = (level: 'ok' | 'warn' | 'over') => ({
     />
     <app-metric-card
       title="Budget"
-      [value]="store.budget().monthlyLimit"
+      [value]="store.budget().monthlyTotal"
     />
     <app-metric-card
       title="Remaining"
-      [value]="store.remainingBudget()"
+      [value]="remaining()"
     />
   </div>
 
@@ -1089,9 +1171,25 @@ const colorFor = (level: 'ok' | 'warn' | 'over') => ({
 </section>
 ```
 
+The two derived values live in `DashboardPageComponent`:
+
+```ts
+protected readonly store = inject(ExpenseStore);
+
+// Budget.monthlyTotal is the limit; alertThreshold is a 0–1 ratio, not a percentage
+protected readonly remaining = computed(() =>
+  this.store.budget().monthlyTotal - this.store.monthlyTotal(),
+);
+protected readonly thresholdPct = computed(() =>
+  this.store.budget().alertThreshold * 100,
+);
+```
+
 **Self-check**
-- [ ] Banner color changes when you cross 60% and 90%
+- [ ] Banner color changes when you cross the store's `alertThreshold` and again past 100%
 - [ ] Progress bar color matches banner level
+- [ ] `store.budget().monthlyTotal` is used for the budget card (the type has no `monthlyLimit`)
+- [ ] `remaining` and `thresholdPct` are `computed()`, not methods called from the template
 - [ ] Removing a row from the list triggers the store's `removeExpense(id)` mutator
 
 ---

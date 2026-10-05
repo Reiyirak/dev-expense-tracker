@@ -48,6 +48,7 @@ The Angular best practices below apply to the code you hand over.
 - Use `computed()` for derived state
 - Prefer inline templates for small components
 - Prefer Signal Forms (`@angular/forms/signals`) for new forms. They are stable in Angular 22+ and provide signal-based state, type-safe field access, and schema-based validation
+- The Signal Forms surface as of 22.1: `form()` **always takes a `WritableSignal` model** (`form(model)`, never `form({...})`), the `FormField` directive (`[formField]="form.fieldName"`) for binding a control, the `FormRoot` directive (`<form [formRoot]="form">`) for `novalidate` + submit wiring, `schema()` / `apply()` for rules, and `field.getError('required')` / `field.errors()` for error reads. `FormField` is required to be imported by the component; `FormRoot` only if you want the `<form>` wiring
 - When not using Signal Forms, prefer Reactive forms instead of Template-driven ones
 - Reactive Forms are **not** deprecated and carry no deprecation notice — they remain fully supported. Signal Forms are the recommended default for *new* forms, not a mandate to migrate existing ones. `compatForm()` from `@angular/forms/signals/compat` bridges a Signal Form to Reactive `FormControl`s when you need both in one app
 - Do NOT use `ngClass`, use `class` bindings instead
@@ -60,7 +61,7 @@ The Angular best practices below apply to the code you hand over.
 - Use `computed()` for derived state
 - Keep state transformations pure and predictable
 - Do NOT use `mutate` on signals, use `update` or `set` instead
-- For async server state prefer the Resource APIs — `httpResource()`, `resource()`, `rxResource()`. They are stable in Angular 22+ and return signal-backed state, so they replace hand-rolled `subscribe()` + `toSignal()` bridges
+- For async server state prefer the Resource APIs. In Angular 22.1 that means exactly two: `httpResource()` from `@angular/common/http` and `resource()` from `@angular/core`. Both are stable and return signal-backed state, so they replace hand-rolled `subscribe()` + `toSignal()` bridges. There is no `rxResource()` in Angular 22 — don't invent one; bridge Observables with `toSignal` / `toObservable` from `@angular/core/rxjs-interop`
 - Use `untracked()` when reading state inside an `effect` that also writes to it, to avoid dependency loops
 
 ## Templates

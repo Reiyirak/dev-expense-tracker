@@ -29,6 +29,18 @@
   3.1's original self-check was wrong — put ReactiveFormsModule in app.config providers —
   amended; ReactiveFormsModule goes in a component's imports array, and Signal Forms
   don't need it. §4 filled. Do not restore the old check.
+- **Angular 22 accuracy audit (done against installed @angular/core|common|forms 22.1.6, CLI 22.1.8):**
+  facts below were verified in `node_modules` type definitions, not from memory — re-verify
+  against the installed version before writing any lesson code.
+  - `form()` takes a **`WritableSignal` model**, never a bare object literal. Overloads: `form(model)`, `form(model, schemaOrOptions)`, `form(model, schema, options)`.
+  - Binding is by directive: `[formField]="form.field"` (`FormField`) on each control, `[formRoot]="form"` on the `<form>` (sets `novalidate`, prevents default submit). No `name=` + `(input)` pairs.
+  - `FieldState.reset(value?)` clears `touched`/`dirty` only — it does **not** clear values. Reset = `form().reset()` + write the model signal.
+  - Errors are `{ kind: 'required' | 'min' | ... }`; read with `field.getError(kind)` / `field.errors()`. Not the Reactive-Forms `null` / `{ key: value }` contract.
+  - Rules: `schema((path) => { required(path.x); min(path.x, n); maxLength(path.x, n); validate(path.x, fn); })`, plus `apply`, `validateTree`, `validateAsync`, `validateHttp`. Root state also has `pending()` / `submitting()`.
+  - `rxResource()` **does not exist** in Angular 22. Only `resource()` (core) and `httpResource()` (common/http). `toSignal`/`toObservable` from `@angular/core/rxjs-interop`.
+  - `form`, `FieldTree`, `FieldState`, `FormField`, `FormRoot`, `schema`, `apply`, `validate` are all `@publicApi 22.0` → "stable in 22", not "graduated in v21".
+  - Confirmed still true: zoneless by default (no zone provider, no `polyfills` in angular.json); **OnPush is the v22 default** (compiler emits nothing when unspecified, runtime does `onPush: changeDetection !== Eager`, enum is `OnPush = 0` / `Eager = 1`); `@Service` exists (22.1.0 shipped an `@Injectable` → `@Service` migration) and the store already uses it; `httpResource(() => url)` signature in 5.2 is valid.
+  - Naming: the form component is **`ExpensesFormComponent`** in `src/app/expenses/expenses-form.component.ts` (plural, matching the `expenses/` folder). The old `ExpenseFormComponent` spelling is retired.
 
 ## Module 4 — Dashboard & Signal-Driven Communication
 - **Status:** pending
