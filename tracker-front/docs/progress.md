@@ -2,6 +2,13 @@
 
 > Running log so any forked session can orient without re-reading the full curriculum. Update as lessons complete.
 
+## Teaching mode — guided code (current)
+- **Status:** active on this branch
+- **What changed:** the "no spoilers / structure only" pedagogy is retired. Lessons are delivered in chat as a from-zero explanation plus complete, paste-ready code blocks.
+- **Hard rule:** the agent must NOT write/create/edit any file (no `src/` writes, no patching files for the user). The user does all copy-pasting, file creation, and typing. Reading the repo to tailor the code is fine; editing `docs/` is fine when explicitly asked.
+- **Where the rules live:** `docs/curriculum.md` → *Pedagogical rules (current)* + *Lesson delivery format*, and the "Lesson Mode" block at the top of `docs/AGENTS.md`.
+- **Lessons 1.1 – 3.1** were authored under the old rule; their "structure only" wording describes lesson *scope*, not delivery. Don't restore it.
+
 ## Module 1 — Project Setup & Modern Architecture
 - **Status:** Module 1 complete
 - **Lessons completed:** 1.1, 1.2, 1.3, 1.4

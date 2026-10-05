@@ -2,29 +2,65 @@
 
 > **Stack:** Angular CLI · Angular 22 · TypeScript (strict) · Tailwind CSS v4
 > **Project:** Dev Expense Tracker (categories: hosting, APIs, domains, courses)
-> **Pedagogy:** No spoilers — concept explanations are abstract; you write the app-specific logic. Full HTML/Tailwind templates are provided as the exception so you focus on Angular mechanics, not styling.
+> **Pedagogy:** Guided code delivery — every lesson explains the topic from scratch and hands you the exact code to write, as text in the chat. You do the typing, file creation, and copy-pasting yourself. Full HTML/Tailwind templates are provided so you can focus on Angular mechanics, not styling.
+>
+> **Mode change (new branch, current):** the original "no spoilers, structure only" pedagogy is retired. Time is short, so lessons now arrive as a full walkthrough plus ready-to-paste code. The code is *given*, never *written for you*.
 
 ---
 
 ## How to use this curriculum
 
-1. **Read the "Concepts" section first.** It teaches the syntax shape — not the answer to the lesson's task.
-2. **Read the "Build" section second.** This is what *you* implement. There are no full Angular TS solutions here on purpose.
-3. **Open `docs/alternatives.md` when a lesson points to it.** That's where the older paradigm lives, fully worked out, alongside the modern approach used in the main codebase.
-4. **Templates marked "Provided" are copy-paste ready** HTML + Tailwind. Everything else is yours to write.
-5. **Each module ends with a self-check.** Use it before moving on.
+1. **Read the "Concepts" section first** — it teaches the topic as if you'd never seen it, plain language, no assumed knowledge.
+2. **Ask for the lesson when you're ready.** The lesson is delivered in chat as: topic explanation → why it matters → the exact code to add, as text → what to check. You copy, paste, and create the files yourself.
+3. **The agent never edits `src/` during a lesson.** It only reads files to confirm your current state and to tailor the code it hands you. Creating and editing files is your job.
+4. **Open `docs/alternatives.md` when a lesson points to it.** That's where the older paradigm lives, fully worked out, alongside the modern approach used in the main codebase.
+5. **Templates marked "Provided" are copy-paste ready** HTML + Tailwind. Everything else arrives as code in the lesson.
+6. **Each module ends with a self-check.** Use it before moving on.
+
+> **Note on the older lesson text.** Lessons 1.1 – 3.1 were authored under the "no spoilers, structure only" rule, so a few of their "What you will build" lines say things like "signature only — no logic given". Those lines describe the *scope* of the lesson, not a restriction on delivery. When a lesson is delivered, you get the complete code plus the explanation. The scope of each lesson has not changed.
 
 ---
 
-## Pedagogical rules (locked in)
+## Pedagogical rules (current)
 
 | Rule | What it means in practice |
 |---|---|
-| **No spoilers** | I never give you the exact TypeScript that solves the lesson's task. Generic syntax only. |
-| **Alternatives documented, not implemented** | When a concept has a legacy + modern form, the modern form goes in `src/`. The legacy form goes in `docs/alternatives.md`. |
-| **Templates are an exception** | HTML + Tailwind is given in full so you can stay focused on Angular TS, signal wiring, and form logic. Templates must pass AXE checks and meet WCAG AA minimums. |
+| **Code in the chat, never in your files** | Every code change is handed to you as text in a fenced block with a path above it. The agent must not create, edit, or delete any file under `src/` (or anywhere else) as part of teaching a lesson. It may read them, and it may edit `docs/`. |
+| **You do the typing** | File creation, copy-paste, formatting, running the CLI, fixing compile errors — all of it stays with you. If something fails, the agent explains the error and gives corrected code; it doesn't patch it for you. |
+| **Explain from zero, every time** | No assumed knowledge and no "you already know this from Lesson X". Concepts repeat → re-explain them, but shorter each time. Jargon is defined the first time it appears. |
+| **Full working code, not skeletons** | No `// ...rest of the code here`, no `TODO`, no "signature only". If a lesson says a file should end up with 4 fields, you get all 4 fields wired. |
+| **Modern form in `src/`, legacy form in docs** | When a concept has a legacy + modern form, the modern form goes in `src/`. The legacy form goes in `docs/alternatives.md`. |
+| **Templates are an exception to your typing** | HTML + Tailwind is given in full either way, so you can stay focused on Angular TS, signal wiring, and form logic. Templates must pass AXE checks and meet WCAG AA minimums. |
 | **Follow `AGENTS.md` strictly** | The project's `AGENTS.md` carries Angular's official v22 best-practices. It's authoritative for: `@Service` over `@Injectable({providedIn: 'root'})`, zoneless-by-default (no `provideZoneChangeDetection`, no `zone.js` polyfill), Signal Forms over Template-Driven forms, Resource APIs for async state, `host` object over `@HostBinding`/`@HostListener`, `class` bindings over `ngClass`, `NgOptimizedImage` over `<img>`, inline templates for small components, no `any` (use `unknown`). When a lesson contradicts it, AGENTS.md wins. |
-| **Concepts repeat → skip explanation** | If a concept appeared earlier, a later lesson just says "Use the pattern from Lesson X to do Y." No re-teaching. |
+
+---
+
+## Lesson delivery format
+
+Each lesson in the chat follows the same shape, in this order:
+
+1. **What this lesson is about** — the topic in plain language, plus why the app needs it. No prior-lesson references.
+2. **The concept, from zero** — how the Angular feature actually works, with minimal generic examples so the idea lands before app code.
+3. **The code, in order** — one fenced block per file, each preceded by its path and a one-line "what this does" note. Blocks are ordered so you can paste them top to bottom. If a file is new, the path says *(new file)*.
+4. **What just happened** — a short recap of the mechanism now running, so the code makes sense rather than just compiling.
+5. **Your checklist** — what to verify (including any self-check items from the curriculum), and what errors to expect if a step was missed.
+6. **Wait** — the agent stops. It does not continue to the next lesson, edit anything, or verify files on your behalf beyond reading them if asked.
+
+**Code fences use this convention:**
+
+````markdown
+`src/app/expenses/expense-form/expense-form.ts` — *(new file)*
+
+```ts
+// full file contents
+```
+````
+
+**Hard limits on the agent during a lesson:**
+
+- No file writes, no `Edit`/`Write` tool calls, no shell commands that modify the repo, no `git checkout`/`stash`/`apply` to hand you a diff.
+- Reading is fine (`read`, `grep`, `glob`, `git status`, `git diff`) — the agent should check your real state so the code it hands you matches your files.
+- `docs/curriculum.md`, `docs/progress.md`, and `docs/alternatives.md` may still be edited when you explicitly ask (e.g. "update progress.md").
 
 ---
 
@@ -35,7 +71,7 @@
   - **Curriculum work (lessons, `docs/`):** Windows is fine and is the usual side for it. Commit + push from Windows, then `git pull` on Linux.
   - **App code (lessons 1.1+, `src/`):** Linux is the working side. Commit + push from Linux, then `git pull` on Windows.
 - **Sync before edits.** Before starting each lesson, `git pull` on the working side so your copy matches the remote. I'll wait for your go-ahead before making file changes.
-- **I don't make changes unilaterally.** When you ask me to "update the curriculum", "scaffold X", or "show me how to do Y", I'll propose or apply — but I won't edit files without you telling me to.
+- **Lessons are hands-off on your files.** From Lesson 3.2 onward the agent teaches and hands over code as chat text; it does not write anything into the repo. See *Lesson delivery format* above. If I ever want a file changed, I'll say so explicitly and you can say no.
 - **OS-aware snippets.** PowerShell blocks stay on Windows-only steps (initialization, push). Bash blocks stay on Linux-only steps (clone, dev). Everything else is OS-neutral.
 - **Package manager: pnpm.** All examples use `pnpm`. The `ng new` flag `--package-manager=pnpm` makes this the default for new installs; CI/scripts should use `pnpm` too.
 
@@ -707,6 +743,8 @@ class Store {
 
 ## Lesson 3.2 — Signal Forms vs Typed Reactive Forms
 
+> **First lesson in guided-code mode.** Delivered in chat as a full walkthrough + paste-ready code blocks. You create and edit the files yourself; the agent does not touch `src/`.
+
 **Concepts**
 - **Signal Forms** (Angular 22, experimental → stable): `form()`, `Field`, schema-based validation, native signal integration
 - **Typed Reactive Forms**: `FormGroup<{ amount: FormControl<number | null> }>`, `nonNullable` variants, validators as pure functions
@@ -737,11 +775,12 @@ const expenseForm = new FormGroup({
 **What you will build**
 - In `ExpenseFormComponent`, create the form instance at component level.
 - Bind inputs through `form.name` signal accessors.
-- Write the submit handler (signature only — no logic given).
+- Write the submit handler. (Curriculum text predates guided-code mode; the delivered lesson includes the full handler code — scope is unchanged.)
 
 **Self-check**
 - [ ] Form is created once (not inside a method)
 - [ ] Field accessors are reactive in the template
+- [ ] The agent did not edit any file in `src/` — you did all the writing
 
 ---
 
