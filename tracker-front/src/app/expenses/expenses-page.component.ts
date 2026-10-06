@@ -1,8 +1,12 @@
 
 import { Component } from "@angular/core";
+import { ExpensesFormComponent } from "./expenses-form.component";
 
 @Component({
   selector: 'app-expenses-page',
-  template: `<p class="text-slate-600">Expenses page (placeholder)</p>`,
+  imports: [ExpensesFormComponent],
+  template: `
+    <app-expenses-form></app-expenses-form>
+  `,
 })
 export class ExpensesPageComponent { }
