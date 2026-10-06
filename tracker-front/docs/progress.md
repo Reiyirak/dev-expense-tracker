@@ -23,12 +23,9 @@
 
 ## Module 3 — Form Handling & Data Logging
 - **Status:** in progress
-- **Lessons completed:** 3.1
-- **Next:** 3.2 — Signal Forms vs Typed Reactive Forms
-- **Notes:** 3.1 is a decision lesson, no code. Committed to Signal Forms (stable in v22).
-  3.1's original self-check was wrong — put ReactiveFormsModule in app.config providers —
-  amended; ReactiveFormsModule goes in a component's imports array, and Signal Forms
-  don't need it. §4 filled. Do not restore the old check.
+- **Lessons completed:** 3.1, 3.2, 3.3
+- **Next:** 3.4 — Connecting Form to Store
+- **Notes:** 3.3 validations were created on the form component.
 - **Angular 22 accuracy audit (done against installed @angular/core|common|forms 22.1.6, CLI 22.1.8):**
   facts below were verified in `node_modules` type definitions, not from memory — re-verify
   against the installed version before writing any lesson code.
@@ -45,6 +42,8 @@
     - `[formField]` is typed against the host element: text/select/date → `string`, number → `number | null`. A union like `Category` in the model fails with *"Type 'WritableSignal<Category>' is not assignable to …"*. Domain unions belong in a rule (3.3) and a narrowing at the store boundary (3.4), not in the form model.
     - `min` / `max` / `required` / `pattern` / `minlength` / `maxlength` are **reserved** next to `[formField]` — they're `MinValidator`-style validator inputs in Reactive Forms — so `min="0"` errors with *"min attribute is not allowed to be used on nodes using formField"*. Use `min(path.amount, 0.01)` in the schema instead. `step`, `inputmode`, `type`, `placeholder` are plain HTML and stay.
   - `tsconfig.json` is missing `"strict": true` (Lesson 1.1 required it and its self-check was ticked anyway). Template type-checking still runs because Angular 22 has `strictTemplates` on by default, but TS-level strictness is off project-wide. Decide before 3.4.
+  - Custom `validate()` rules have two traps, both verified in the installed runtime (`ArrayMergeIgnoreLogic.compute`): the callback gets a `FieldContext` whose `value` is a **`Signal`**, so write `value()`; and the return contract is `undefined`/`null` = valid vs an error object = invalid. A bare `false` is *kept* as the error itself, so `errors()` fills with booleans and `getError(kind)` finds nothing. Use a ternary.
+  - `FormSubmitOptions.action` is **required**; `onInvalid` is optional. `form(model, schema, { submission: { onInvalid } })` does not compile — a submission config needs its `action`. Built-in rules take `{ message }` **or** `{ error }`, never both (it's a union type).
 
 ## Module 4 — Dashboard & Signal-Driven Communication
 - **Status:** pending

@@ -833,15 +833,19 @@ protected readonly expenseForm = form(
     required(path.date);
     maxLength(path.note, 200);
 
-    validate(path.category, ({ value }) =>
-      (CATEGORIES as readonly string[]).includes(value) || { kind: 'category' },
+    validate(path.amount, ({ value }) =>
+      value() > 0 ? undefined : { kind: 'positive', message: 'Amount must be greater than 0.' },
     );
-    validate(path.amount, ({ value }) => value > 0 || { kind: 'positive' });
+    validate(path.category, ({ value }) =>
+      (CATEGORIES as readonly string[]).includes(value())
+        ? undefined
+        : { kind: 'category', message: 'Pick one of the four categories.' },
+    );
   }),
 );
 ```
 
-`validate()`'s argument is the **field state** (a `FieldState`, so call it), not a raw value — `{ value }` is destructured out of it. A rule returns `true` when valid, or a truthy error object when not.
+`validate()`'s callback receives a **`FieldContext`**, whose `value` is a *signal* — `value()`, not `value`. And the return contract is strict: **`undefined`/`null` means valid**, an error object (or array of them) means invalid. Returning a bare boolean is a type error, and at runtime `false` is stored *as the error itself*, so `errors()` fills with `false` and `getError('positive')` finds nothing. Always use the ternary.
 
 ```ts
 // reading state in TS or a template
@@ -979,30 +983,34 @@ Notes on the deltas from the old version of this template:
 
 **Syntax shape (the real 22.x flow)**
 ```ts
-type ExpenseDraft = Omit<Expense, 'id'>;
-
 private readonly store = inject(ExpenseStore);
-private readonly model = signal<ExpenseDraft>({
-  amount: 0, category: 'hosting', date: '', note: '',
-});
-protected readonly expenseForm = form(this.model, expenseSchema);
 
-protected onSubmit(): void {
-  if (this.expenseForm().invalid()) {
-    this.expenseForm().markAsTouched();   // reveal the errors, keep the values
-    return;
-  }
+protected readonly expenseForm = form(
+  this.model,
+  expenseSchema,                                   // the schema from 3.3
+  {
+    submission: {
+      // `action` is REQUIRED by FormSubmitOptions — a submission config without it
+      // does not compile. `onInvalid` is the optional half.
+      action: async (draft) => {
+        // The form model holds `category: string` because that's all a <select> can give us.
+        // 3.3's `validate(path.category, …)` rule already proved it's one of CATEGORIES,
+        // so this assertion is the type system's receipt for that runtime check.
+        const value = draft().value();
+        this.store.addExpense({ ...value, category: value.category as Category });
 
-  // The form model holds `category: string` because that's all a <select> can give us.
-  // 3.3's `validate(path.category, …)` rule already proved it's one of CATEGORIES,
-  // so this assertion is the type system's receipt for that runtime check.
-  const draft = this.expenseForm().value();
-  this.store.addExpense({ ...draft, category: draft.category as Category });
-
-  this.expenseForm().reset();   // clears touched/dirty
-  this.model.set(emptyDraft);   // clears the values — reset() will not do this
-}
+        this.expenseForm().reset();   // clears touched/dirty
+        this.model.set(emptyDraft);   // clears the values — reset() will not do this
+      },
+      onInvalid: () => {
+        this.expenseForm().markAsTouched();   // reveal every error, keep the values
+      },
+    },
+  },
+);
 ```
+
+Note there is **no `(submit)` handler in the template** — `[formRoot]` calls `submit()` on the tree, which runs validation and then routes to `action` (valid) or `onInvalid` (invalid). An `action` callback is `async` because its return type is `Promise<TreeValidationResult>`; returning nothing means success.
 
 `ExpenseStore.addExpense(input: Omit<Expense, 'id'>)` already calls `crypto.randomUUID()` internally, so the component must not generate ids.
 

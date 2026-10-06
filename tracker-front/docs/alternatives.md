@@ -495,13 +495,15 @@ import { Category } from '../shared/types';
 export class ExpensesFormComponent {
   private readonly model = signal({
     amount: 0,
-    category: '' as Category,
+    category: '',   // string, not Category — [formField] is typed against the host element
     date: '',
     note: '',
   });
 
   protected readonly expenseForm = form(this.model, schema((path) => {
-    validate(path.amount, ({ value }) => value > 0 || { positive: true });
+    validate(path.amount, ({ value }) =>
+      value() > 0 ? undefined : { kind: 'positive', message: 'Amount must be greater than 0.' },
+    );
   }));
 }
 ```
@@ -571,7 +573,7 @@ Do **not** reach for them on a new form in a signals codebase: every control is 
 | Reading a value | `form.amount().value()` — a signal | `form.controls.amount.value` — a plain read, not reactive |
 | Reactivity | free; it *is* a signal | needs `valueChanges` + `async` pipe, or `toSignal` |
 | Validation | `schema((path) => { required(path.x); min(path.x, 1); })` | `Validators` arrays: `Validators.required`, `Validators.min(0.01)` |
-| Custom rule | `validate(path.x, ({ value }) => … || { kind: 'positive' })` | a `ValidatorFn`: `(c: AbstractControl) => … \|\| { positive: true }` |
+| Custom rule | `validate(path.x, ({ value }) => value() > 0 ? undefined : { kind: 'positive' })` — return `undefined`, never a boolean | a `ValidatorFn`: `(c: AbstractControl) => … \|\| { positive: true }` |
 | Cross-field | `validate` / `validateTree` over paths | a group-level `ValidatorFn` on the `FormGroup` |
 | Touched / dirty | automatic per `[formField]` binding | manual `markAsTouched()`, or `{ updateOn: 'blur' }` |
 | Errors | `field.errors()` / `field.getError('min')` | `control.errors`, untyped `ValidationErrors \| null` |
@@ -710,10 +712,14 @@ export class ExpensesFormComponent {
     schema((path) => {
       required(path.amount);
       min(path.amount, 0.01);
-      validate(path.amount, ({ value }) => value > 0 || { kind: 'positive' });
+      validate(path.amount, ({ value }) =>
+        value() > 0 ? undefined : { kind: 'positive', message: 'Amount must be greater than 0.' },
+      );
       required(path.category);
       validate(path.category, ({ value }) =>
-        (CATEGORIES as readonly string[]).includes(value) || { kind: 'category' },
+        (CATEGORIES as readonly string[]).includes(value())
+          ? undefined
+          : { kind: 'category', message: 'Pick one of the four categories.' },
       );
       required(path.date);
       maxLength(path.note, 200);
@@ -730,8 +736,8 @@ Same four fields, same five rules. The rules are now one readable block that wal
 2. Delete the `FormGroup` literal. Move each `FormControl`'s initial value into one `signal({...})` — that object *is* the form.
 3. `nonNullable: true` → delete it. Nullability now comes from the model's type, and you must widen number fields to `number | null` if the control can be empty.
 4. `Validators.required` / `min` / `max` / `maxLength` / `pattern` → `required(path.x)` / `min(path.x, n)` / `max` / `maxLength` / `pattern` inside `schema(...)`. The HTML attributes `min`, `max`, `maxlength`, `pattern`, `required` are **reserved** next to `[formField]` and must be deleted from the template.
-5. Custom `ValidatorFn` `(c: AbstractControl) => … || { positive: true }` → `validate(path.x, ({ value }) => … || { kind: 'positive' })`. The argument is a `FieldState`, not an `AbstractControl` — destructure what you need.
-6. Group-level cross-field `ValidatorFn` on the `FormGroup` → `validate(path.a, ({ value, ... }) => …)` reading sibling paths, or `validateTree` for a subtree.
+5. Custom `ValidatorFn` `(c: AbstractControl) => … || { positive: true }` → `validate(path.x, ({ value }) => value() > 0 ? undefined : { kind: 'positive' })`. Two traps: the callback gets a `FieldContext` (so `value` is a signal — `value()`), and the return contract is `undefined`/`null` = valid, error object = invalid. A bare `false` becomes the error itself, so `errors()` fills with booleans and `getError()` finds nothing.
+6. Group-level cross-field `ValidatorFn` on the `FormGroup` → `validate(path.a, ({ valueOf }) => …)` reading sibling paths through the context's `valueOf(path.b)`, or `validateTree` for a subtree.
 7. `[formGroup]="form"` on the `<form>` → `[formRoot]="expenseForm"`, and delete the manual `novalidate` (FormRoot sets it).
 8. `formControlName="amount"` on each control → `[formField]="expenseForm.amount"`. No `name` attribute either.
 9. `(ngSubmit)="onSubmit()"` → move the handler into the form's options: `form(model, { submission: { action } })`. Note `action` must be `async` and receives the tree (`draft().value()`).
