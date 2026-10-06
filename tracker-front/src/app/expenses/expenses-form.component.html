@@ -1,0 +1,96 @@
+<form [formRoot]="expenseForm" class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+  <header>
+    <h2 class="text-lg font-semibold">Log a new expense</h2>
+    <p class="text-sm text-slate-500">Track where your dev budget goes.</p>
+  </header>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <!-- Amount -->
+    <label class="block text-sm">
+      <span class="mb-1 block font-medium text-slate-700">Amount (USD)</span>
+      <input
+        type="number"
+        step="0.01"
+        inputmode="decimal"
+        [formField]="expenseForm.amount"
+        [attr.aria-invalid]="showAmountError()"
+        [class.border-red-500]="showAmountError()"
+        aria-describedby="amount-error"
+        class="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+      />
+      @if (showAmountError()) {
+        <p id="amount-error" class="mt-1 text-xs text-red-600">
+          {{ expenseForm.amount().errors()[0]?.message }}
+        </p>
+      }
+    </label>
+
+    <!-- Category -->
+    <label class="block text-sm">
+      <span class="mb-1 block font-medium text-slate-700">Category</span>
+      <select
+        [formField]="expenseForm.category"
+        [attr.aria-invalid]="showCategoryError()"
+        [class.border-red-500]="showCategoryError()"
+        aria-describedby="category-error"
+        class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm
+               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+      >
+        @for (category of categories; track category) {
+          <option [value]="category">{{ category }}</option>
+        }
+      </select>
+      @if (showCategoryError()) {
+        <p id="category-error" class="mt-1 text-xs text-red-600">
+          {{ expenseForm.category().errors()[0]?.message }}
+        </p>
+      }
+    </label>
+
+    <!-- Date -->
+    <label class="block text-sm">
+      <span class="mb-1 block font-medium text-slate-700">Date</span>
+      <input
+        type="date"
+        [formField]="expenseForm.date"
+        [attr.aria-invalid]="showDateError()"
+        [class.border-red-500]="showDateError()"
+        aria-describedby="date-error"
+        class="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+      />
+      @if (showDateError()) {
+        <p id="date-error" class="mt-1 text-xs text-red-600">
+          {{ expenseForm.date().errors()[0]?.message }}
+        </p>
+      }
+    </label>
+
+    <!-- Note -->
+    <label class="block text-sm sm:col-span-2">
+      <span class="mb-1 block font-medium text-slate-700">Note (optional)</span>
+      <input
+        type="text"
+        placeholder="e.g. Annual Vercel renewal"
+        [formField]="expenseForm.note"
+        class="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+      />
+    </label>
+  </div>
+
+  <footer class="flex items-center justify-between">
+    <p class="text-xs text-slate-500">All amounts in USD. You can edit categories later.</p>
+    <button
+      type="submit"
+      [disabled]="expenseForm().submitting()"
+      class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white
+             hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2
+             focus-visible:ring-slate-900 focus-visible:ring-offset-2
+             disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      Save expense
+    </button>
+  </footer>
+</form>
