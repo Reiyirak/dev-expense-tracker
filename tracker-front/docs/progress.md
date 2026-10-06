@@ -41,6 +41,10 @@
   - `form`, `FieldTree`, `FieldState`, `FormField`, `FormRoot`, `schema`, `apply`, `validate` are all `@publicApi 22.0` → "stable in 22", not "graduated in v21".
   - Confirmed still true: zoneless by default (no zone provider, no `polyfills` in angular.json); **OnPush is the v22 default** (compiler emits nothing when unspecified, runtime does `onPush: changeDetection !== Eager`, enum is `OnPush = 0` / `Eager = 1`); `@Service` exists (22.1.0 shipped an `@Injectable` → `@Service` migration) and the store already uses it; `httpResource(() => url)` signature in 5.2 is valid.
   - Naming: the form component is **`ExpensesFormComponent`** in `src/app/expenses/expenses-form.component.ts` (plural, matching the `expenses/` folder). The old `ExpenseFormComponent` spelling is retired.
+  - Two hard Signal Forms constraints found while delivering 3.2 (both are template diagnostics, so they only show up with template type-checking on):
+    - `[formField]` is typed against the host element: text/select/date → `string`, number → `number | null`. A union like `Category` in the model fails with *"Type 'WritableSignal<Category>' is not assignable to …"*. Domain unions belong in a rule (3.3) and a narrowing at the store boundary (3.4), not in the form model.
+    - `min` / `max` / `required` / `pattern` / `minlength` / `maxlength` are **reserved** next to `[formField]` — they're `MinValidator`-style validator inputs in Reactive Forms — so `min="0"` errors with *"min attribute is not allowed to be used on nodes using formField"*. Use `min(path.amount, 0.01)` in the schema instead. `step`, `inputmode`, `type`, `placeholder` are plain HTML and stay.
+  - `tsconfig.json` is missing `"strict": true` (Lesson 1.1 required it and its self-check was ticked anyway). Template type-checking still runs because Angular 22 has `strictTemplates` on by default, but TS-level strictness is off project-wide. Decide before 3.4.
 
 ## Module 4 — Dashboard & Signal-Driven Communication
 - **Status:** pending

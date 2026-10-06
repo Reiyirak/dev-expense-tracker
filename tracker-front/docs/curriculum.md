@@ -778,6 +778,8 @@ export class ExpensesFormComponent {
 - **Binding is done by directive, not by accessor.** `[formField]="expenseForm.amount"` hands a `FieldState` to an element; the directive wires value in/out both ways and tracks touched/dirty. The property path is the accessor, but you never call it in the template to bind a value.
 - **`FormRoot` is optional and only about the `<form>` element.** It sets `novalidate`, prevents the default submit, and calls `submit()` on the tree when submission options are configured. If you skip it you must handle `(submit)` yourself and keep `novalidate` by hand.
 - Read state through the field: `expenseForm.amount().value()`, `.errors()`, `.touched()`, `.valid()`, `.getError('required')`, and on the root `expenseForm().value()`, `.valid()`, `.errors()`.
+- **The field's value type must match what the native control produces.** `[formField]` is typed against the host: `<input type="text">`, `<select>` and `<input type="date">` yield `string`; `<input type="number">` yields `number | null`. Declaring `category: '' as Category` fails to compile — *"Type 'WritableSignal<Category>' is not assignable to type '{ (): string; set: (v: string) => void }'"* — because a DOM control can only ever hand you a string. Keep domain unions (`Category`) out of the form model, enforce them with a rule in 3.3, and narrow at the store boundary in 3.4.
+- **Constraint HTML attributes are reserved.** `min`, `max`, `required`, `pattern`, `minlength` and `maxlength` are *validator directive inputs* in Reactive Forms (`MinValidator` matches `input[type=number][min][ngModel]` and friends), so putting `min="0"` next to `[formField]` errors with *"min attribute is not allowed to be used on nodes using formField"*. Those rules are written in the schema instead. `step`, `inputmode`, `placeholder` and `type` are plain HTML and stay.
 - `FormField` must be in the component's `imports`. `FormRoot` only if you use `[formRoot]`.
 
 **Typed Reactive Forms (legacy) shape, for contrast only**
@@ -820,7 +822,7 @@ const expenseForm = new FormGroup({
 **Syntax shape (the real 22.x form)**
 ```ts
 // Schema-based rules, built once at component level
-private readonly model = signal({ amount: 0, category: '' as Category, date: '', note: '' });
+private readonly model = signal({ amount: 0, category: '', date: '', note: '' });
 
 protected readonly expenseForm = form(
   this.model,
@@ -831,11 +833,15 @@ protected readonly expenseForm = form(
     required(path.date);
     maxLength(path.note, 200);
 
-    // custom rule: return true when valid, or an error object when not
+    validate(path.category, ({ value }) =>
+      (CATEGORIES as readonly string[]).includes(value) || { kind: 'category' },
+    );
     validate(path.amount, ({ value }) => value > 0 || { kind: 'positive' });
   }),
 );
 ```
+
+`validate()`'s argument is the **field state** (a `FieldState`, so call it), not a raw value — `{ value }` is destructured out of it. A rule returns `true` when valid, or a truthy error object when not.
 
 ```ts
 // reading state in TS or a template
@@ -853,9 +859,10 @@ readonly showAmountError = computed(
 ```
 
 **What you will build**
-- Apply rules: required + positive amount, valid category, valid date.
+- Apply rules: required + positive amount, required date, and a category that is actually one of `CATEGORIES`.
 - Cap `note` at 200 characters with `maxLength(path.note, 200)`.
 - Show inline error text per field using Tailwind classes you pick, gated on `touched()` (or on a submit attempt).
+- The category rule is the one that earns 3.4 its cast: it turns an arbitrary `string` into a checked value.
 
 **Provided Template — `src/app/expenses/expenses-form.component.html`**
 
@@ -879,7 +886,6 @@ readonly showAmountError = computed(
         type="number"
         inputmode="decimal"
         step="0.01"
-        min="0"
         [formField]="expenseForm.amount"
         [class.border-red-500]="showAmountError()"
         class="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
@@ -947,7 +953,9 @@ readonly showAmountError = computed(
 
 Notes on the deltas from the old version of this template:
 - `name="amount"` etc. are gone — `[formField]` is the binding, and it supplies the generated field name.
-- `maxlength="200"` is gone — that's a rule now (`maxLength(path.note, 200)` in 3.3), not an HTML attribute.
+- `min="0"` is gone — `min` is a **reserved attribute** next to `[formField]` (it's a `MinValidator` input in Reactive Forms), so the rule lives in the schema: `min(path.amount, 0.01)`. `step="0.01"` and `inputmode="decimal"` are plain HTML and stay.
+- `maxlength="200"` is gone — same reason; it's `maxLength(path.note, 200)` in 3.3.
+- `<select>` + `[formField]` produces a **`string`**, not a `Category`. The "is it a real category?" rule below is what makes the value trustworthy.
 - `<p class="... hidden ...">` became `@if`, because a `hidden` class plus a signal binding is a trap; the class binding on the input is `[class.border-red-500]="showAmountError()"`.
 - `imports: [FormField, FormRoot]` must be on the component.
 
@@ -985,7 +993,11 @@ protected onSubmit(): void {
     return;
   }
 
-  this.store.addExpense(this.expenseForm().value());  // store mints the id
+  // The form model holds `category: string` because that's all a <select> can give us.
+  // 3.3's `validate(path.category, …)` rule already proved it's one of CATEGORIES,
+  // so this assertion is the type system's receipt for that runtime check.
+  const draft = this.expenseForm().value();
+  this.store.addExpense({ ...draft, category: draft.category as Category });
 
   this.expenseForm().reset();   // clears touched/dirty
   this.model.set(emptyDraft);   // clears the values — reset() will not do this
@@ -995,7 +1007,7 @@ protected onSubmit(): void {
 `ExpenseStore.addExpense(input: Omit<Expense, 'id'>)` already calls `crypto.randomUUID()` internally, so the component must not generate ids.
 
 **What you will build**
-- Wire the form's submit to `ExpenseStore.addExpense()`, passing the form's value signal.
+- Wire the form's submit to `ExpenseStore.addExpense()`, narrowing `category` from `string` to `Category` at the boundary.
 - Let the store own id generation (it already does).
 - On success call both resets: `expenseForm().reset()` **and** `model.set(emptyDraft)`. On failure, neither.
 - Confirm the new row appears in the dashboard list (built in Module 4).

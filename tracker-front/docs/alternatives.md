@@ -548,6 +548,241 @@ Signal Forms smell (modern, stable as of Angular 22):
 
 **Filled during:** Lesson 3.2 (Signal Forms vs Typed Reactive Forms)
 
+### When you'd reach for it
+
+Reactive Forms are **not deprecated** — they carry no deprecation notice in Angular 22 and remain fully supported. Reach for them when:
+
+- You're maintaining a form that already exists and works. Migrating is optional work, not a bug fix.
+- You need `ControlValueAccessor` (a third-party input component with its own `writeValue`/`registerOnChange` contract) and you'd rather not wrap it in a Signal Forms `FormValueControl`.
+- A library exposes `FormGroup`/`FormControl` instances as part of *its* public API and you need them as real controls, not as a mirrored `FieldTree`.
+- You're on an Angular version below 21/22 without the Signal Forms package.
+
+Do **not** reach for them on a new form in a signals codebase: every control is a second copy of your data, and reading state means either a subscription, an `async` pipe, or a `toSignal` bridge — the exact bridge work this curriculum removes.
+
+### The diff vs. the modern path
+
+| Concern | Signal Forms (modern) | Typed Reactive (legacy) |
+|---|---|---|
+| Import | `form`, `FormField`, `FormRoot` from `@angular/forms/signals` | `ReactiveFormsModule` from `@angular/forms` |
+| Construction | `form(modelSignal, schema(...))` | `new FormGroup({ amount: new FormControl(0, { nonNullable: true }) })` |
+| Source of truth | your model signal, the only copy | the `FormGroup`; you sync it to a store by hand |
+| Binding | `[formField]="form.amount"` + `[formRoot]` | `[formGroup]="form"` + `formControlName="amount"` |
+| Nullability | the control's value type, inferred from the model | `FormControl<number \| null>` unless you pass `nonNullable: true` |
+| Reading a value | `form.amount().value()` — a signal | `form.controls.amount.value` — a plain read, not reactive |
+| Reactivity | free; it *is* a signal | needs `valueChanges` + `async` pipe, or `toSignal` |
+| Validation | `schema((path) => { required(path.x); min(path.x, 1); })` | `Validators` arrays: `Validators.required`, `Validators.min(0.01)` |
+| Custom rule | `validate(path.x, ({ value }) => … || { kind: 'positive' })` | a `ValidatorFn`: `(c: AbstractControl) => … \|\| { positive: true }` |
+| Cross-field | `validate` / `validateTree` over paths | a group-level `ValidatorFn` on the `FormGroup` |
+| Touched / dirty | automatic per `[formField]` binding | manual `markAsTouched()`, or `{ updateOn: 'blur' }` |
+| Errors | `field.errors()` / `field.getError('min')` | `control.errors`, untyped `ValidationErrors \| null` |
+| Submit | `form(model, { submission: { action } })` — no template handler | `(ngSubmit)` on the `<form>` + `markAllAsTouched()` |
+| Reset | `form().reset()` **+** write the model signal | `form.reset()` clears values *and* state in one call |
+| Storing | pass `form().value()` straight to the store | build the payload from `getRawValue()`, then `reset()` |
+
+### What it looks like in legacy code
+
+The same expense form, typed Reactive edition:
+
+```ts
+// expenses-form.component.ts (typed Reactive Forms)
+import { Component, inject } from '@angular/core';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
+
+import { ExpenseStore } from '../shared/expense.store';
+import { CATEGORIES } from '../shared/types';
+
+const positiveAmount = (c: AbstractControl): ValidationErrors | null =>
+  (c.value as number) > 0 ? null : { positive: true };
+
+const knownCategory = (c: AbstractControl): ValidationErrors | null =>
+  (CATEGORIES as readonly string[]).includes(c.value as string)
+    ? null
+    : { category: true };
+
+@Component({
+  selector: 'app-expenses-form',
+  imports: [ReactiveFormsModule],
+  template: `
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      <label>
+        Amount (USD)
+        <input type="number" formControlName="amount" />
+      </label>
+      @if (form.controls.amount.touched && form.controls.amount.invalid) {
+        <p>Amount must be greater than 0.</p>
+      }
+
+      <label>
+        Category
+        <select formControlName="category">
+          @for (c of categories; track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
+      </label>
+
+      <label>Date <input type="date" formControlName="date" /></label>
+      <label>Note <input type="text" formControlName="note" /></label>
+
+      <button type="submit">Save expense</button>
+    </form>
+  `,
+})
+export class ExpensesFormComponent {
+  private readonly store = inject(ExpenseStore);
+
+  protected readonly categories = CATEGORIES;
+
+  protected readonly form = new FormGroup({
+    amount: new FormControl(0, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(0.01), positiveAmount],
+    }),
+    category: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, knownCategory],
+    }),
+    date: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
+    note: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.maxLength(200)],
+    }),
+  });
+
+  protected onSubmit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.store.addExpense(this.form.getRawValue());
+    this.form.reset({ amount: 0, category: '', date: '', note: '' });
+  }
+}
+```
+
+Count the ceremony the Signal Forms version doesn't have: a `FormGroup` literal, four `FormControl` constructors with options objects, two custom `ValidatorFn` declarations, `ReactiveFormsModule` in `imports`, `[formGroup]` + `formControlName` on every control, a `markAllAsTouched()` call before bailing, and a `getRawValue()` copy before the reset.
+
+### What it looks like in modern code
+
+```ts
+// expenses-form.component.ts (Signal Forms) — the real 3.2/3.3 code
+import { Component, computed, signal } from '@angular/core';
+import { form, maxLength, min, required, schema, validate } from '@angular/forms/signals';
+import { FormField, FormRoot } from '@angular/forms/signals';
+
+import { CATEGORIES } from '../shared/types';
+
+@Component({
+  selector: 'app-expenses-form',
+  imports: [FormField, FormRoot],
+  template: `
+    <form [formRoot]="expenseForm">
+      <input type="number" [formField]="expenseForm.amount" />
+      <select [formField]="expenseForm.category">
+        @for (c of categories; track c) {
+          <option [value]="c">{{ c }}</option>
+        }
+      </select>
+      <input type="date" [formField]="expenseForm.date" />
+      <input type="text" [formField]="expenseForm.note" />
+      <button type="submit">Save expense</button>
+    </form>
+  `,
+})
+export class ExpensesFormComponent {
+  protected readonly categories = CATEGORIES;
+
+  private readonly model = signal({ amount: 0, category: '', date: '', note: '' });
+
+  protected readonly expenseForm = form(
+    this.model,
+    schema((path) => {
+      required(path.amount);
+      min(path.amount, 0.01);
+      validate(path.amount, ({ value }) => value > 0 || { kind: 'positive' });
+      required(path.category);
+      validate(path.category, ({ value }) =>
+        (CATEGORIES as readonly string[]).includes(value) || { kind: 'category' },
+      );
+      required(path.date);
+      maxLength(path.note, 200);
+    }),
+  );
+}
+```
+
+Same four fields, same five rules. The rules are now one readable block that walks the same paths as the template, and there is no `FormGroup` object to keep in sync with anything.
+
+### Translation checklist (Typed Reactive → Signal Forms)
+
+1. `ReactiveFormsModule` import → import `FormField` (and `FormRoot`) from `@angular/forms/signals`.
+2. Delete the `FormGroup` literal. Move each `FormControl`'s initial value into one `signal({...})` — that object *is* the form.
+3. `nonNullable: true` → delete it. Nullability now comes from the model's type, and you must widen number fields to `number | null` if the control can be empty.
+4. `Validators.required` / `min` / `max` / `maxLength` / `pattern` → `required(path.x)` / `min(path.x, n)` / `max` / `maxLength` / `pattern` inside `schema(...)`. The HTML attributes `min`, `max`, `maxlength`, `pattern`, `required` are **reserved** next to `[formField]` and must be deleted from the template.
+5. Custom `ValidatorFn` `(c: AbstractControl) => … || { positive: true }` → `validate(path.x, ({ value }) => … || { kind: 'positive' })`. The argument is a `FieldState`, not an `AbstractControl` — destructure what you need.
+6. Group-level cross-field `ValidatorFn` on the `FormGroup` → `validate(path.a, ({ value, ... }) => …)` reading sibling paths, or `validateTree` for a subtree.
+7. `[formGroup]="form"` on the `<form>` → `[formRoot]="expenseForm"`, and delete the manual `novalidate` (FormRoot sets it).
+8. `formControlName="amount"` on each control → `[formField]="expenseForm.amount"`. No `name` attribute either.
+9. `(ngSubmit)="onSubmit()"` → move the handler into the form's options: `form(model, { submission: { action } })`. Note `action` must be `async` and receives the tree (`draft().value()`).
+10. `markAllAsTouched()` on a failed submit → `form().markAsTouched()` (same method name).
+11. `control.errors` → `field.errors()`; `control.hasError('min')` → `field.getError('min')`. Errors are `{ kind: 'min', … }` objects, not `{ min: {…} }` maps — any error-mapping code has to be rewritten.
+12. `control.valueChanges.pipe(debounceTime(300))` → read `field().value()` directly; the debouncing is the framework's problem.
+13. `form.reset(value)` → **two** calls: `form().reset()` for `touched`/`dirty`, then `model.set(initialValue)` for the values. `reset()` in Signal Forms deliberately does not touch the data.
+14. `setErrors` / `disable()` on a control from outside → `validate()` rules, `disabled(path.x, …)` logic, and `apply()` for reusable schema fragments.
+15. `FormBuilder` → nothing. There is no builder; the model signal replaces it.
+16. A control you cannot move (an `ngModel`-only or CVA-only third-party input) → keep it and bridge it into the model signal with one write. One legacy field shouldn't dictate the architecture of the form.
+
+### The escape hatch: `compatForm()`
+
+If you must keep real `FormControl` instances — a legacy library API, or a form you're migrating field by field — `compatForm()` from `@angular/forms/signals/compat` wraps a model whose properties *are* Reactive controls and hands back a normal `FieldTree`:
+
+```ts
+import { FormControl } from '@angular/forms';
+import { required } from '@angular/forms/signals';
+import { compatForm } from '@angular/forms/signals/compat';   // rules come from /signals, not /compat
+
+const lastName = new FormControl('Ada');                 // a real FormControl
+const model = signal({ first: '', last: lastName });
+const form = compatForm(model, (path) => {
+  required(path.first);                                 // schema rules still apply
+});
+
+form.last().value();  // 'Ada' — the FormControl's value, unwrapped for you
+```
+
+That gives you top-down migration without a flag day. It is a bridge, not a destination: new forms here don't use it.
+
+### Quick recognition patterns
+
+Typed Reactive smell (when scanning a legacy codebase):
+- `import { ReactiveFormsModule } from '@angular/forms'` in a component's `imports`
+- `new FormGroup(`, `FormBuilder`, `FormArray`, `AbstractControl` in a `ValidatorFn` signature
+- `[formGroup]` + `formControlName` on template controls
+- `.valueChanges`, `.statusChanges`, `.patchValue`, `.setValue` in component code
+- `control.errors?.['required']` — index access into an untyped error bag
+- `markAllAsTouched()` sprinkled around submit handlers
+- A store that has to be manually synced with `form.valueChanges.subscribe(...)`
+- An `async` pipe or `toSignal` bridge existing purely to make a form observable
+
+Signal Forms smell (modern, stable as of Angular 22):
+- `form(...)` from `@angular/forms/signals` producing a `FieldTree`
+- A plain `signal({...})` acting as the form's single source of truth
+- `schema(...)` + `validate(...)` holding the rules
+- Field reads shaped like `myForm.field().value()`, `myForm().invalid()`, `myForm.field().touched()`
+- `reset()` **plus** a `model.set(...)`, rather than one `reset(value)`
+- No `ReactiveFormsModule` import anywhere in the app
+
 ## §6 — `@Input` / `@Output` decorators
 
 **Filled during:** Lesson 4.1 (Signal Inputs / Outputs / Model)
