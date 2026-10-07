@@ -1,4 +1,4 @@
-import { Component, computed, signal } from "@angular/core";
+import { Component, computed, inject, signal } from "@angular/core";
 import {
   form,
   FormField,
@@ -10,7 +10,13 @@ import {
   validate,
 } from "@angular/forms/signals";
 
-import { CATEGORIES } from '../shared/types';
+import { ExpenseStore } from "../shared/expense.store";
+import { CATEGORIES, Category } from '../shared/types';
+
+// One definition of "empty", used both for the initial state and for the reset.
+// Spreading it into `signal()`/`set()` gives each one its own object — sharing a
+// single mutable object here would be a bug waiting to happen.
+const EMPTY_DRAFT = { amount: 0, category: '', date: '', note: '' };
 
 @Component({
   selector: 'app-expenses-form',
@@ -20,12 +26,8 @@ import { CATEGORIES } from '../shared/types';
 export class ExpensesFormComponent {
   protected readonly categories = CATEGORIES;
 
-  private readonly model = signal({
-    amount: 0,
-    category: '',
-    date: '',
-    note: '',
-  });
+  private readonly store = inject(ExpenseStore);
+  private readonly model = signal({ ...EMPTY_DRAFT });
 
   protected readonly expenseForm = form(
     this.model,
@@ -47,7 +49,20 @@ export class ExpensesFormComponent {
     {
       submission: {
         action: async (draft) => {
-          console.info('submitted', draft().value());
+          const value = draft().value();
+
+          // Only runs when every rule passed, so `value.category` is provably in
+          // CATEGORIES — see 3.3's membership rule. The store mints the id.
+          this.store.addExpense({ ...value, category: value.category as Category });
+
+          // Two resets: state first, then the data itself.
+          this.expenseForm().reset();
+          this.model.set({ ...EMPTY_DRAFT });
+        },
+
+        onInvalid: () => {
+          // Reveal every message at once. Nothing the user typed is discarded.
+          this.expenseForm().markAsTouched();
         },
       },
     },
@@ -64,4 +79,10 @@ export class ExpensesFormComponent {
   protected readonly showDateError = computed(
     () => this.expenseForm.date().touched() && this.expenseForm.date().invalid(),
   );
+
+  protected readonly showNoteError = computed(
+    () => this.expenseForm.note().touched() && this.expenseForm.note().invalid(),
+  );
+
+  protected readonly noteLength = computed(() => this.expenseForm.note().value().length);
 }
