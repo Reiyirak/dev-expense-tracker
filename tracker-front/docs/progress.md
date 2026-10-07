@@ -22,10 +22,18 @@
 - **Notes:** use side effects to load and save the state of the storage
 
 ## Module 3 — Form Handling & Data Logging
-- **Status:** in progress
-- **Lessons completed:** 3.1, 3.2, 3.3
-- **Next:** 3.4 — Connecting Form to Store
-- **Notes:** 3.3 validations were created on the form component.
+- **Status:** Module 3 complete (3.1–3.4). All curriculum self-checks pass; `ng build` is clean.
+- **Lessons completed:** 3.1, 3.2, 3.3, 3.4
+- **Next:** Module 4 → Lesson 4.1 (Signal Inputs / Outputs / Model)
+- **Files touched in Module 3:** `src/app/expenses/expenses-form.component.ts` (new logic, external template), `src/app/expenses/expenses-form.component.html` (new), `src/app/expenses/expenses-page.component.ts` (composes the form), `tsconfig.json` (`"strict": true` added).
+- **Shape of the finished form (so Module 4 doesn't re-derive it):**
+  - `EMPTY_DRAFT = { amount: 0, category: '', date: '', note: '' }` module-level const; the model is `signal({ ...EMPTY_DRAFT })`. Reset = `expenseForm().reset()` **then** `model.set({ ...EMPTY_DRAFT })`.
+  - One `form(model, schema, options)` call, six rules in the schema, submission configured with `action` (store write + reset) and `onInvalid` (`markAsTouched()`). **No `(submit)` handler and no manual `novalidate` in the template** — `[formRoot]` owns both.
+  - The template's Category `<select>` has an explicit `<option value="">Choose a category…</option>` so the DOM and the model's `''` agree.
+  - Five `show*Error` computeds (`touched() && invalid()`) + a `noteLength()` counter. Every rule has a message and a visible voice — keep that invariant when adding fields.
+  - The form model types `category` as `string`; 3.4's `action` narrows it with `value.category as Category` immediately after 3.3's `validate(path.category, …)` membership rule proved it. **Don't delete either half.**
+  - The store owns ids (`crypto.randomUUID()` inside `addExpense`). Components must never mint ids.
+- **Verification trick for Module 4:** `DashboardPageComponent` already renders `{{ store.monthlyTotal() }}`, and `monthlyTotal` filters on `date.startsWith('YYYY-MM')` for the *current* month. Add an expense dated today → the dashboard number moves. Date it in another month and the total won't change (that's the filter, not a bug).
 - **Angular 22 accuracy audit (done against installed @angular/core|common|forms 22.1.6, CLI 22.1.8):**
   facts below were verified in `node_modules` type definitions, not from memory — re-verify
   against the installed version before writing any lesson code.
@@ -41,15 +49,16 @@
   - Two hard Signal Forms constraints found while delivering 3.2 (both are template diagnostics, so they only show up with template type-checking on):
     - `[formField]` is typed against the host element: text/select/date → `string`, number → `number | null`. A union like `Category` in the model fails with *"Type 'WritableSignal<Category>' is not assignable to …"*. Domain unions belong in a rule (3.3) and a narrowing at the store boundary (3.4), not in the form model.
     - `min` / `max` / `required` / `pattern` / `minlength` / `maxlength` are **reserved** next to `[formField]` — they're `MinValidator`-style validator inputs in Reactive Forms — so `min="0"` errors with *"min attribute is not allowed to be used on nodes using formField"*. Use `min(path.amount, 0.01)` in the schema instead. `step`, `inputmode`, `type`, `placeholder` are plain HTML and stay.
-  - `tsconfig.json` is missing `"strict": true` (Lesson 1.1 required it and its self-check was ticked anyway). Template type-checking still runs because Angular 22 has `strictTemplates` on by default, but TS-level strictness is off project-wide. Decide before 3.4.
+  - `tsconfig.json` was missing `"strict": true` (Lesson 1.1 required it and its self-check was ticked anyway). **Fixed during 3.3** — verified the whole app *and* the specs compile clean with it, then `ng build` clean. `strictTemplates` is still absent from `angularCompilerOptions` but Angular 22 enables it by default (it's why the `Category` template error surfaced at all); add it explicitly when convenient.
   - Custom `validate()` rules have two traps, both verified in the installed runtime (`ArrayMergeIgnoreLogic.compute`): the callback gets a `FieldContext` whose `value` is a **`Signal`**, so write `value()`; and the return contract is `undefined`/`null` = valid vs an error object = invalid. A bare `false` is *kept* as the error itself, so `errors()` fills with booleans and `getError(kind)` finds nothing. Use a ternary.
   - `FormSubmitOptions.action` is **required**; `onInvalid` is optional. `form(model, schema, { submission: { onInvalid } })` does not compile — a submission config needs its `action`. Built-in rules take `{ message }` **or** `{ error }`, never both (it's a union type).
 
 ## Module 4 — Dashboard & Signal-Driven Communication
 - **Status:** pending
 - **Lessons completed:** —
-- **Next:** —
-- **Notes:** —
+- **Next:** 4.1 — Signal Inputs / Outputs / Model
+- **Notes:** Lesson 4.3's provided dashboard template was corrected during the 3.4 audit: it called `store.budget().monthlyLimit`, `store.remainingBudget()` and `store.alertThresholdPct()`, none of which exist. `Budget` has `monthlyTotal` + `alertThreshold` (a 0–1 ratio), and the "Remaining" / "Threshold %" figures are `computed()`s that belong in `DashboardPageComponent`. Also: banner tiers come from `store.alertLevel()` (warn at `alertThreshold`, over past `monthlyTotal`) — do not hard-code 60/90.
+- **Also due in Module 4:** `docs/alternatives.md §6` (`@Input`/`@Output`) and `§7` (`*ngIf`/`*ngFor`) are still empty placeholders.
 
 ## Module 5 — Filtering, CSV Export & Advanced Features
 - **Status:** pending
