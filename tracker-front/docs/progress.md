@@ -54,17 +54,39 @@
   - `FormSubmitOptions.action` is **required**; `onInvalid` is optional. `form(model, schema, { submission: { onInvalid } })` does not compile — a submission config needs its `action`. Built-in rules take `{ message }` **or** `{ error }`, never both (it's a union type).
 
 ## Module 4 — Dashboard & Signal-Driven Communication
-- **Status:** pending
-- **Lessons completed:** —
-- **Next:** 4.1 — Signal Inputs / Outputs / Model
-- **Notes:** Lesson 4.3's provided dashboard template was corrected during the 3.4 audit: it called `store.budget().monthlyLimit`, `store.remainingBudget()` and `store.alertThresholdPct()`, none of which exist. `Budget` has `monthlyTotal` + `alertThreshold` (a 0–1 ratio), and the "Remaining" / "Threshold %" figures are `computed()`s that belong in `DashboardPageComponent`. Also: banner tiers come from `store.alertLevel()` (warn at `alertThreshold`, over past `monthlyTotal`) — do not hard-code 60/90.
-- **Also due in Module 4:** `docs/alternatives.md §6` (`@Input`/`@Output`) and `§7` (`*ngIf`/`*ngFor`) are still empty placeholders.
+- **Status:** in progress (4.1 complete)
+- **Lessons completed:** 4.1
+- **Next:** 4.2 — Modern Control Flow
+- **Files touched in 4.1:** `src/app/dashboard/metric-card.component.ts` (new), `alert-banner.component.ts` (new), `expense-row.component.ts` (new), `dashboard-page.component.ts` (rewritten from a one-line stub into the parent that composes the three children), `src/app/shared/expense.store.ts` (see banner-dismissal note).
+- **Design decisions taken in 4.1 (don't re-derive them):**
+  - The three child components live in `src/app/dashboard/` with selectors `app-metric-card` / `app-alert-banner` / `app-expense-row`. Small → **inline** templates (matches `budget-page.component.ts`; only the big form uses an external one).
+  - `level` is typed `input.required<AllowanceLevel>()`, **not** the curriculum's optional `input<'ok'|'warn'|'over'>()` — the union already exists in `shared/types.ts` and required is the honest contract.
+  - `dismissed` is a **`model(false)`**, not the curriculum's `output<void>()`, so the lesson has a real two-way example. Cost: 4.3's provided template line `(dismissed)="onAlertDismissed()"` must become `[dismissed]="store.alertDismissed()"` + `(dismissedChange)="store.dismissAlert()"`.
+  - `removed` is `output<string>()` carrying **the expense id only**, never the `Expense` — the parent already holds the object. Children never inject `ExpenseStore`; the parent calls `store.removeExpense($event)` directly.
+  - The dashboard got **one plain `@for`** with `track e.id` purely so a child input has something to render. `@empty` / `@switch` are still 4.2's job. Only **two** metric cards exist (Spent, Budget) — the "Remaining" card + `remaining()` computed arrive in 4.3.
+- **HARD-WON GOTCHA — `input()` / `output()` / `model()` must NOT be `protected`:**
+  - Declaring them `protected readonly` produces **`TS2445`**, one error **per parent binding site**: `Property 'title' is protected and only accessible within class 'MetricCardComponent' and its subclasses.` A build with 3 children yielded 7 errors, all of them in the *parent* file.
+  - **The diagnostic signal: zero errors inside the child's own template; every error reported in the parent.** That's what identifies it.
+  - Why: each template's type-check block is emitted as a synthetic method named `_tcbN` (`TCB_FUNCTION_PREFIX = "_tcb"`, `@angular/compiler-cli/bundles/chunk-VBASOQS5.js` ~L9632, emitted by `generateTypeCheckBlock2(env, component, fnName, …)` ~L10028) that type-checks *as if* inside the component's own class — so a component's own template can read its own `protected` members fine. A **parent's** binding of a child's input becomes an ordinary property write against a value typed as the child class, sitting in the *parent's* class body, so plain TypeScript's `protected` rule fires. It is a raw `TS` error surfaced via the `angular-compiler` plugin, not an Angular-specific rule.
+  - **Rule:** inputs/outputs/models are the component's **public API** → declare them **public**. Keep `protected` for members only your *own* template touches (an `inject()`ed store, a local `computed()`, a local UI signal) — `DashboardPageComponent` does exactly that.
+  - Fix: drop `protected`, write `readonly` (`public readonly` is identical). `readonly` is desirable on all three: it blocks the meaningless `this.title = 'x'` while permitting `expense()` reads, `dismissed.set(...)` and `removed.emit(...)`. Note `readonly` on a **`model()` does not block `.set()`** — it only forbids reassigning the field.
+- **HARD-WON GOTCHA — component-local signal state dies with the component:**
+  - Symptom hit in 4.1: a dismissed alert banner reappeared after navigating `/dashboard` → `/expenses` → `/dashboard`.
+  - Cause: `signal(false)` as a class field is a **field initialiser**, so it runs per *instance*. `app.html` uses `[routerLink]` into a plain `<router-outlet />` with no reuse strategy, so `DashboardPageComponent` is **destroyed and recreated** — the local signal resets. This is **not** a `model()` vs `output()` issue; `output<void>()` + a local flag has the identical lifetime. **Lifetime comes from where the state lives, not from which API wrote it.**
+  - **Rule:** state that must outlive the component belongs in the singleton store (`@Service()` = root scope = one instance for the whole app).
+  - Fix applied: `ExpenseStore` gained `_alertDismissed = signal(false)`, `readonly alertDismissed = this._alertDismissed.asReadonly()`, and `dismissAlert()`. The dashboard binds the model **longhand** — `[dismissed]="store.alertDismissed()"` + `(dismissedChange)="store.dismissAlert()"` — which is exactly what `[(dismissed)]="x"` expands to, written out because the target is a read-only signal we can't assign to. `AlertBannerComponent` itself did not change.
+  - **Deliberately not persisted.** It is a plain signal that `_persist` never *reads*, and an effect only tracks signals it reads — so it never reaches `localStorage`. Dismissal therefore survives navigation but **not** a reload. Persisting it would mean the alert could never be seen again.
+  - **Known open gap, not built:** the banner stays dismissed even if `alertLevel()` later crosses `warn`. Re-showing on a level change would need an `effect()` that resets the flag, with `untracked()` because it writes state it reads. Kept out of 4.1 on purpose.
+- **Month filtering is Module 5 work, not a bug.** The row list reads `store.expenses()` (all time, unfiltered) while the card reads `store.monthlyTotal()` (`date.startsWith('YYYY-MM')`, current month only) — so a past- **or future**-dated expense gets a row but doesn't move the card. Already signed off as the Module 4 verification trick. The real product gap is that the page is headed "Monthly overview" while the list below it is all-time; the fix is a month filter → **Module 5**.
+- **Lesson 4.3's provided dashboard template was corrected during the 3.4 audit:** it called `store.budget().monthlyLimit`, `store.remainingBudget()` and `store.alertThresholdPct()`, none of which exist. `Budget` has `monthlyTotal` + `alertThreshold` (a 0–1 ratio), and the "Remaining" / "Threshold %" figures are `computed()`s that belong in `DashboardPageComponent`. Also: banner tiers come from `store.alertLevel()` (warn at `alertThreshold`, over past `monthlyTotal`) — do not hard-code 60/90.
+- **Deferred by explicit user decision (4.1):** `docs/alternatives.md §6` (`@Input`/`@Output`) and `§7` (`*ngIf`/`*ngFor`) are still empty placeholders. User chose "code first" — they get written at the Module 4 self-check, alongside §7 due in 4.2.
+- **Cosmetic, declined:** `ExpenseStore.addExpense` still declares `let newExpense` where `const` would do. Left as-is; not worth a commit on its own.
 
 ## Module 5 — Filtering, CSV Export & Advanced Features
 - **Status:** pending
 - **Lessons completed:** —
 - **Next:** —
-- **Notes:** —
+- **Notes:** **Carry in from 4.1:** the dashboard's expense list is all-time while its "Spent this month" card is month-scoped, which is the page's main product inconsistency. A month filter is the obvious 5.1 candidate. The banner-dismissal gap (dismissed banner stays hidden across a `warn`/`over` threshold crossing) is also parked here.
 
 ## Phase 2 — .NET Backend Integration
 - **Status:** reserved (waits on Phase 1 completion)
