@@ -42,6 +42,10 @@ import { ExpenseStore } from '../shared/expense.store';
         <li>
           <app-expense-row [expense]="e" (removed)="store.removeExpense($event)" />
         </li>
+      } @empty {
+        <li class="py-6 text-center text-sm text-slate-500">
+          No expenses logged yet. Add one on the Expenses page.
+        </li>
       }
     </ul>
   </section>

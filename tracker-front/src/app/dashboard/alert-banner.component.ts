@@ -5,25 +5,35 @@ import { AllowanceLevel } from '../shared/types';
 @Component({
   selector: 'app-alert-banner',
   template: `
-    @if (!dismissed()) {
-      <div
-        role="status"
-        class="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-      >
-        <p class="text-sm text-slate-700">
-          Budget status:
-          <span class="font-semibold text-slate-900">{{ level() }}</span>
+  @if (!dismissed()) {
+    <div
+      role="status"
+      class="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+    >
+      @if (level() === 'over') {
+        <p class="text-sm font-medium text-slate-900">
+          You are over budget for this month.
         </p>
-        <button
-          type="button"
-          (click)="dismissed.set(true)"
-          class="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2
-                 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-        >
-          Dismiss
-        </button>
-      </div>
-    }
+      } @else if (level() === 'warn') {
+        <p class="text-sm font-medium text-slate-900">
+          You have reached the alert threshold for this month.
+        </p>
+      } @else {
+        <p class="text-sm font-medium text-slate-900">
+          You are within budget for this month.
+        </p>
+      }
+
+      <button
+        type="button"
+        (click)="dismissed.set(true)"
+        class="shrink-0 rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2
+        focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+      >
+        Dismiss
+      </button>
+    </div>
+  }
   `,
 })
 export class AlertBannerComponent {
