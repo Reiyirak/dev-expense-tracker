@@ -10,8 +10,18 @@ export class ExpenseStore {
   private readonly _expenses = signal<Expense[]>(this._initial.expenses);
   private readonly _budget = signal<Budget>(this._initial.budget);
 
+  // Declared BEFORE the persist effect on purpose. It is a plain signal, not  // part of the payload written to localStorage below: dismissal should survive
+  // route navigation (the store is a singleton, the dashboard component is not)
+  // but NOT survive a reload. "Stop showing me this banner" is session-scoped;
+  // persisting it would mean the alert could never be seen again.
+  //
+  // Because the persist effect below never reads this signal, the effect
+  // never tracks it either — an effect only depends on signals it reads.
+  private readonly _alertDismissed = signal(false);
+
   readonly expenses = this._expenses.asReadonly();
   readonly budget = this._budget.asReadonly();
+  readonly alertDismissed = this._alertDismissed.asReadonly();
 
   private readonly _persist = effect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -69,6 +79,10 @@ export class ExpenseStore {
       ...current,
       alertThreshold: threshold
     }));
+  }
+
+  dismissAlert(): void {
+    this._alertDismissed.set(true);
   }
 
   private loadInitial(): { expenses: Expense[]; budget: Budget } {
