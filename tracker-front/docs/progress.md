@@ -54,10 +54,31 @@
   - `FormSubmitOptions.action` is **required**; `onInvalid` is optional. `form(model, schema, { submission: { onInvalid } })` does not compile — a submission config needs its `action`. Built-in rules take `{ message }` **or** `{ error }`, never both (it's a union type).
 
 ## Module 4 — Dashboard & Signal-Driven Communication
-- **Status:** in progress (4.1 complete)
-- **Lessons completed:** 4.1
-- **Next:** 4.2 — Modern Control Flow
-- **Files touched in 4.1:** `src/app/dashboard/metric-card.component.ts` (new), `alert-banner.component.ts` (new), `expense-row.component.ts` (new), `dashboard-page.component.ts` (rewritten from a one-line stub into the parent that composes the three children), `src/app/shared/expense.store.ts` (see banner-dismissal note).
+- **Status:** complete (4.1, 4.2, 4.3). Module self-check passed; `ng build` clean.
+- **Lessons completed:** 4.1, 4.2, 4.3
+- **Next:** Module 5 → 5.1 (RxJS ↔ Signal Interop)
+- **Files touched in Module 4:** `src/app/dashboard/metric-card.component.ts` (new), `alert-banner.component.ts` (new), `expense-row.component.ts` (new), `dashboard-page.component.ts` (rewritten from a one-line stub into the parent that composes the children), `src/app/shared/expense.store.ts` (+ alert-dismissal state).
+- **Module 4 self-check result (all pass):** no `@Input()`/`@Output()` decorators in `src/`; no `*ngIf`/`*ngFor`/`ngSwitch`; every `@for` carries a `track`; 4 required inputs are `input.required`; `(removed)` payload is the expense id; `remaining`/`thresholdPct`/`spentPct` are `computed()`; all 9 tier colour classes confirmed present in the built CSS.
+- **Lessons 4.2 and 4.3 — what changed on top of 4.1:**
+  - **4.2** rewrote `alert-banner.component.ts`'s three `@if`/`@else if` branches into a `MESSAGE` map lookup (4.3 collapsed those branches further into one element), and added `@let e = expense()` plus a `@switch`/`@default` category chip to `expense-row.component.ts`. `dashboard-page.component.ts` gained the `@empty` branch.
+  - **The row's `@default` is a real runtime fallback, not decoration.** `ExpenseStore.loadInitial()` casts unvalidated `localStorage` JSON straight to `Expense[]`, so a stale or hand-edited `category` can genuinely arrive; the chip renders the raw value instead of going blank. **Do not "improve" this to `@default never`** — that removes the runtime fallback.
+  - **4.3** made colour data-driven: `TIER` / `TIER_FILL` / `MESSAGE` are module-level `Record<AllowanceLevel, string>` literals, bound with `[class]="tier()"`. `metric-card.component.ts` gained **optional** `progress` and `level` inputs driving a `role="progressbar"` bar.
+  - **Curriculum correction (4.3):** the provided syntax shape says `[className]`. That is React's spelling; it compiles in Angular only because HTML's `className` is a DOM alias for `class`, and it **bypasses Angular's static-class merging**. Use `[class]`. The provided template's `(dismissed)="onAlertDismissed()"` is also superseded by the longhand bind already used.
+- **HARD-WON GOTCHA — Tailwind is a build-time scanner, not a runtime engine (verified on tailwindcss 4.3.3):**
+  - Tailwind reads source files **as text** at build time and emits CSS only for class names it can see. **Every dynamic class must appear as a complete literal string somewhere in source**, or it silently ships nothing — with a *successful* build and no error.
+  - Empirically confirmed in a scratch build: `ok: 'bg-emerald-50'` in a `.ts` file → **present** in CSS; `` `bg-${tone}-600` `` → **missing**. That is why `TIER`/`TIER_FILL` are literal `Record`s and never string interpolation. Comment above `TIER` in `alert-banner.component.ts` warns future editors.
+  - Escape hatch, verified working: `@source inline("bg-emerald-600 bg-amber-600 bg-red-600");` in `src/styles.css` forces specific classes into the build. This is v4's replacement for the old `safelist` array — this project is CSS-first (`@import "tailwindcss"` + `@tailwindcss/postcss` in `.postcssrc.json`), so there is no `tailwind.config.js` to edit.
+  - Type the map `Record<AllowanceLevel, string>`, never `Record<string, string>`: adding a member to the union must be a compile error, not a runtime `undefined`.
+  - Grep gotcha when auditing built CSS: Tailwind escapes `.` and `/` in selectors, so `grep '\.h-1\.5'` misses `h-1.5` (real selector is `.h-1\.5`). Escape before grepping or the check falsely reports MISSING.
+- **HARD-WON GOTCHA — `[class]` binding semantics (verified in the 22.1.6 runtime):**
+  - `[class]="expr"` **merges** with the static `class` attribute — `checkStylingMap` does `concatStringsWithSpace(tNode.classesWithoutHost, value)`. Put layout in the literal `class` and colour in the bound string; neither clobbers the other.
+  - Switching tiers **does** remove the old colour: `updateStylingMap` diffs old vs new keys and emits `undefined` for vanished ones, then `applyStyling` calls `renderer.removeClass` on falsy values. Verified end to end — no stale backgrounds.
+  - `[className]` is React syntax. Works by accident on HTML (DOM alias) but skips the merge above and would drop layout classes. Use `[class]`.
+- **HARD-WON GOTCHA — two `0`/`NaN` traps in the derived dashboard values:**
+  - `@if (barWidth())` would **hide** the progress bar at exactly 0% because `0` is falsy. Hence the separate `hasBar()` computed (`this.progress() !== undefined`) — "no bar" and "zero percent" are different states.
+  - `spentPct` needs `budget === 0 ? 0 : …` or a zero budget renders literal `NaN%`.
+  - `barWidth()` clamps with `Math.min(100, Math.max(0, …))` so overspending can't overflow the track.
+- **Float note, corrected:** `0.8 * 100` is exactly `80`, **not** `80.00000000000001` (an earlier draft claimed otherwise — verified with node). Float noise is real but subtler: `0.29 * 100 === 28.999999999999996` and `(29/200)*100 === 14.499999999999998`. Keep the `Math.round()` on that basis only.
 - **Design decisions taken in 4.1 (don't re-derive them):**
   - The three child components live in `src/app/dashboard/` with selectors `app-metric-card` / `app-alert-banner` / `app-expense-row`. Small → **inline** templates (matches `budget-page.component.ts`; only the big form uses an external one).
   - `level` is typed `input.required<AllowanceLevel>()`, **not** the curriculum's optional `input<'ok'|'warn'|'over'>()` — the union already exists in `shared/types.ts` and required is the honest contract.
@@ -79,14 +100,20 @@
   - **Known open gap, not built:** the banner stays dismissed even if `alertLevel()` later crosses `warn`. Re-showing on a level change would need an `effect()` that resets the flag, with `untracked()` because it writes state it reads. Kept out of 4.1 on purpose.
 - **Month filtering is Module 5 work, not a bug.** The row list reads `store.expenses()` (all time, unfiltered) while the card reads `store.monthlyTotal()` (`date.startsWith('YYYY-MM')`, current month only) — so a past- **or future**-dated expense gets a row but doesn't move the card. Already signed off as the Module 4 verification trick. The real product gap is that the page is headed "Monthly overview" while the list below it is all-time; the fix is a month filter → **Module 5**.
 - **Lesson 4.3's provided dashboard template was corrected during the 3.4 audit:** it called `store.budget().monthlyLimit`, `store.remainingBudget()` and `store.alertThresholdPct()`, none of which exist. `Budget` has `monthlyTotal` + `alertThreshold` (a 0–1 ratio), and the "Remaining" / "Threshold %" figures are `computed()`s that belong in `DashboardPageComponent`. Also: banner tiers come from `store.alertLevel()` (warn at `alertThreshold`, over past `monthlyTotal`) — do not hard-code 60/90.
-- **Deferred by explicit user decision (4.1):** `docs/alternatives.md §6` (`@Input`/`@Output`) and `§7` (`*ngIf`/`*ngFor`) are still empty placeholders. User chose "code first" — they get written at the Module 4 self-check, alongside §7 due in 4.2.
+- **Policy vs. paint split (4.3):** the **store** owns when you are `warn`/`over`; the **components** own which colours those verdicts wear. Neither may re-derive the other's numbers. Change `budget().alertThreshold` to 0.5 and the header, banner and bar all update from that one number.
+- **`alternatives.md §6` and `§7` are now filled in** (written at the Module 4 self-check, as the user chose in 4.1). Both cover: when you'd still meet the legacy form, a diff table, a worked code example, why the modern path is better, a numbered translation checklist, and quick-recognition patterns for scanning legacy code. **§8** (`HttpClient` + `toSignal`) is still a placeholder — due in 5.2.
+- **Contrast issue, fixed:** `expenses-form.component.html` line 78 used `text-slate-400` for the `{{ noteLength() }}/200` counter (**2.56:1** on white, below WCAG AA). Now `text-slate-500` (**4.76:1**, passes). Rule of thumb for this repo: `slate-500` is the lightest slate that passes AA for normal text on white — don't reach for `400`.
 - **Cosmetic, declined:** `ExpenseStore.addExpense` still declares `let newExpense` where `const` would do. Left as-is; not worth a commit on its own.
 
 ## Module 5 — Filtering, CSV Export & Advanced Features
 - **Status:** pending
 - **Lessons completed:** —
-- **Next:** —
-- **Notes:** **Carry in from 4.1:** the dashboard's expense list is all-time while its "Spent this month" card is month-scoped, which is the page's main product inconsistency. A month filter is the obvious 5.1 candidate. The banner-dismissal gap (dismissed banner stays hidden across a `warn`/`over` threshold crossing) is also parked here.
+- **Next:** 5.1 — RxJS ↔ Signal Interop
+- **Notes:**
+  - **Carry in from 4.1:** the dashboard's expense list is all-time while its "Spent this month" card is month-scoped, which is the page's main product inconsistency. A month filter is the obvious 5.1 candidate.
+  - **Carry in from 4.1:** the banner-dismissal gap — a dismissed banner stays hidden even if `alertLevel()` later crosses `warn`/`over`. An `effect()` in `DashboardPageComponent` resetting the flag on level change would fix it, but needs `untracked()` because it writes state it reads. Deliberately kept out of Module 4.
+  - `store.byCategory()` exists (Module 2) and is currently unused by any template — a natural 5.1 grouping/chart input.
+  - `docs/alternatives.md §8` (`HttpClient` + `toSignal` manual bridge) is the last empty placeholder; fill it during 5.2.
 
 ## Phase 2 — .NET Backend Integration
 - **Status:** reserved (waits on Phase 1 completion)

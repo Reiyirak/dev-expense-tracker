@@ -793,9 +793,246 @@ Signal Forms smell (modern, stable as of Angular 22):
 
 **Filled during:** Lesson 4.1 (Signal Inputs / Outputs / Model)
 
+### When you'd reach for it
+- Maintaining a pre-Angular 17.1 codebase (signal inputs landed in 17.1; decorators were still the norm)
+- A third-party component library that exposes `@Input()` / `@Output()` in its public API
+- An `@Input() setter` that coerces or transforms values, with no way to inherit that behaviour from a signal input
+
+You will **not** write new `@Input()` / `@Output()` code in 2026. You will **read** a lot of it.
+
+### The diff vs. the modern path
+
+| Concern | Signal API (modern) | Decorators (legacy) |
+|---|---|---|
+| Declare a value in | `title = input<string>('')` | `@Input() title = ''` |
+| Declare a required value | `title = input.required<string>()` | `@Input() title!: string` (a lie; nothing enforces it) or `@Required()` |
+| Read the value | `title()` — a signal | `title` — a plain property |
+| Emit an event | `removed = output<string>()` + `.emit(id)` | `@Output() removed = new EventEmitter<string>()` + `.emit(id)` |
+| Two-way value | `dismissed = model(false)` (one declaration, both directions) | `@Input() value` + `@Output() valueChange` (two declarations, kept in sync by hand) |
+| React to changes | Read the signal in a `computed()`/`effect()` — change detection is reactive | `ngOnChanges` (fires only for `@Input` writes, needs `SimpleChanges` bookkeeping) |
+| Input name in template | Class field name, or `{ alias: 'x' }` | Class field name, or `@Input('x')` |
+| Validate/coerce on the way in | `{ transform: (v) => Number(v) }` | `@Input() set value(v: string \| number) { … }` — a setter that runs on every write |
+| Missing required input | **Compile error**, `NG8008` | Nothing. `undefined` at runtime, or a dev-mode warning |
+
+### Anatomy of the decorator version
+
+```ts
+@Component({
+  selector: 'app-expense-row',
+  template: `
+    <div class="flex items-center justify-between">
+      <span>{{ expense.note || expense.category }}</span>
+      <button (click)="onRemove()">Remove</button>
+    </div>
+  `,
+})
+export class ExpenseRowComponent implements OnChanges, OnInit {
+  // A plain property. Nothing tells TypeScript a parent must set this, and
+  // nothing checks it at compile time — hence the `!`.
+  @Input({ required: true }) expense!: Expense;
+
+  // EventEmitter is a subclass of RxJS Subject. You get an Observable back,
+  // which is why `.subscribe()` and `takeUntil` show up all over legacy code.
+  @Output() removed = new EventEmitter<string>();
+
+  // Two-way binding has to be built by hand: TWO declarations whose names must
+  // agree, and a convention that writes flow input -> change output.
+  @Input() dismissed = false;
+  @Output() dismissedChange = new EventEmitter<boolean>();
+
+  // Reaction to input changes is imperative and manual. Note the two different
+  // shapes: ngOnChanges only fires for @Input writes, ngOnInit fires once.
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['expense']) {
+      this.expense = changes['expense'].currentValue;
+    }
+  }
+  ngOnInit(): void { /* … */ }
+
+  onRemove(): void {
+    this.removed.emit(this.expense.id);
+  }
+}
+```
+
+The template for the *other side* of that, from the parent:
+
+```html
+<!-- Legacy: value + (valueChange) spelled out, and the parent must mirror the flag -->
+<app-expense-row [expense]="e" [dismissed]="isDismissed" (dismissedChange)="isDismissed = $event" />
+
+<!-- Modern: one signal owns it, one declaration on the child -->
+<app-expense-row [expense]="e" [(dismissed)]="bannerDismissed" />
+```
+
+### Why the decorator path is worse, specifically
+
+**1. Nothing enforces required inputs.** `@Input({ required: true })` is a *hint*. Omit the binding and the property is `undefined` and your template throws at render time, or silently renders `"undefined"`. The signal version fails the **build**:
+
+```
+Required input 'expense' from component ExpenseRowComponent must be specified.   // NG8008
+```
+
+**2. Reading an input is invisible to Angular.** `this.expense` is a plain property read — Angular cannot record that a computed or template depends on it, so it cannot know what to re-check. `expense()` is a signal read, which is *tracked*. This is the same reason signals replaced zone-based change detection as the default.
+
+**3. Two-way binding is two declarations plus a naming convention.** `dismissed` + `dismissedChange` are unrelated to each other as far as the compiler is concerned — typo one and it fails silently. `model(false)` generates both from a single field, and the compiler keeps them in lockstep.
+
+**4. The coercion story forks.** With `@Input()` you write a setter, which means a setter body, which means `@Input() set value(v) { this._value = coerce(v) }` plus a getter. With a signal you attach a `transform` and keep the field declarative.
+
+### Translation checklist (`@Input`/`@Output` → signal API)
+
+1. Delete the `OnChanges`/`OnInit`/`SimpleChanges` imports and the `implements` clause.
+2. `@Input() x = initial` → `readonly x = input(initial)`.
+3. `@Input({ required: true }) x!: T` → `readonly x = input.required<T>()`. **Then delete the `!`** — the non-null assertion exists only because the old system couldn't see the binding.
+4. `@Input() x!: T` with no default → `input.required<T>()` if a parent must always pass it, else `input<T>()` and handle `undefined`.
+5. **Remove `protected` from inputs, outputs and models.** They are the public API. `protected readonly x = input.required<T>()` compiles inside its own template but fails with `TS2445` at every parent binding site — "Property 'x' is protected and only accessible within class …". This exact trap cost a build in 4.1.
+6. `@Output() e = new EventEmitter<T>()` → `readonly e = output<T>()`, then `this.e.emit(v)` → `this.e.emit(v)` (unchanged). Delete the `EventEmitter` import.
+7. `@Input() v` + `@Output() vChange` → `readonly v = model(initial)`. Delete one of the two declarations and the hand-rolled sync logic.
+8. Every read `this.expense` → `this.expense()`. Every template `{{ expense.note }}` → `{{ expense().note }}`.
+9. `@Input('alias') x` → `readonly x = input<...>({ alias: 'alias' })`.
+10. `@Input() set v(raw) { this._v = coerce(raw) }` → `input(initial, { transform: (raw) => coerce(raw) })`.
+11. `ngOnChanges` branches → `computed()` for derived state, `effect()` for side effects. Neither needs a lifecycle hook.
+12. `EventEmitter` used as a stream (`.subscribe`, `.pipe`) → an `output()` can't be subscribed to like that; use a signal and read it, or keep a separate RxJS subject if the stream semantics are genuinely needed.
+
+### Quick recognition patterns
+
+Decorator smell (when scanning a legacy codebase):
+- `@Input() / @Output() / @Input({ required: true })` in any component
+- `implements OnChanges, OnInit, OnDestroy` with `ngOnChanges(changes: SimpleChanges)` full of `if (changes['x'])` branches
+- `new EventEmitter<T>()` — and often `.subscribe(...)` / `.pipe(...)` on it
+- `imports: [CommonModule]` just to get `*ngIf` / `*ngFor` (see §7)
+- A matched `@Input() value` + `@Output() valueChange` pair with a hand-written sync in the parent
+- `@Input() set foo(...)` — a setter doing coercion
+- `!` non-null assertions on input fields
+- `@ViewChild` / `@ContentChild` for plain element references (these are *not* deprecated; use `viewChild()`/`contentChild()`)
+
+Signal-API smell (modern):
+- `input()`, `input.required()`, `output()`, `model()` from `@angular/core`
+- Inputs read with `()` everywhere, in TS and in templates
+- `computed()` in place of `ngOnChanges` branches
+- `[(someModel)]` banana-in-a-box on a component element
+- No `EventEmitter` import anywhere in the project
+
 ## §7 — `*ngIf` / `*ngFor` legacy control flow
 
 **Filled during:** Lesson 4.2 (Modern Control Flow)
+
+### When you'd reach for it
+- Any codebase written before Angular 17
+- A third-party component whose template you can't edit
+- Very old tutorials and a lot of pre-2023 blog content
+
+`*ngIf` and `*ngFor` are **not deprecated**. They are fully supported in Angular 22 and will not be removed. They're just no longer the tool you'd reach for, because `@if`/`@for` are faster and read like JavaScript.
+
+### The diff vs. the modern path
+
+| Concern | Built-in blocks (modern) | Structural directives (legacy) |
+|---|---|---|
+| Conditional | `@if (cond) { } @else if { } @else { }` | `*ngIf="cond"` + `<ng-template [ngIf]>` for the else |
+| Loop | `@for (item of items; track item.id) { }` | `*ngFor="let item of items; trackBy: fn"` |
+| Empty state | `@empty { }` inside the `@for` | `@if (items.length === 0) { }` beside the loop |
+| Multi-way branch | `@switch` / `@case` / `@default` | `ngSwitch` / `ngSwitchCase` / `ngSwitchDefault` |
+| Key for DOM reuse | `track item.id` — **mandatory** | `trackBy` — optional, off by default |
+| Position variables | `; let i = $index, f = $first, l = $last, e = $even, o = $odd` | `let i = index; let f = first; let l = last` |
+| Local alias | `@let x = expensiveRead()` | none — use a getter or a nested `<ng-container *ngIf="… as x">` |
+| Cost | compile-time instructions | a directive class shipped to the browser + an embedded view at runtime |
+
+### Anatomy of the directive version
+
+```html
+<!-- Conditional, with an else. Note the <ng-template> gymnastics. -->
+<div *ngIf="expenses.length > 0; else noExpenses">
+  <ul>
+    <li *ngFor="let e of expenses; trackBy: trackById; let i = index">
+      {{ i + 1 }}. {{ e.category }} — {{ e.amount }}
+    </li>
+  </ul>
+</div>
+
+<ng-template #noExpenses>
+  <p>No expenses logged yet.</p>
+</ng-template>
+
+<!-- Multi-way branch: four directives that must be kept in sync by hand. -->
+<div [ngSwitch]="expense.category">
+  <span *ngSwitchCase="'hosting'">Hosting</span>
+  <span *ngSwitchCase="'apis'">APIs</span>
+  <span *ngSwitchCase="'domains'">Domains</span>
+  <span *ngSwitchDefault>{{ expense.category }}</span>
+</div>
+```
+
+And the class side — `trackBy` and a `getter` standing in for `@let`:
+
+```ts
+@Component({ /* … */ })
+export class ExpenseListComponent {
+  // Without trackBy, *ngFor falls back to identity: remove item 0 and every
+  // following row's DOM is destroyed and rebuilt, losing focus and scroll.
+  trackById(_index: number, expense: Expense): string {
+    return expense.id;
+  }
+
+  // The pre-@let idiom for reading the same nested signal more than once.
+  get label(): string {
+    return this.expense.note || this.expense.category;
+  }
+}
+```
+
+### Why the directive path is worse, specifically
+
+**1. The else-branch costs a second directive and a named template.** `*ngIf="…; else x"` plus `<ng-template #x>` is two moving parts. `@else { }` is a keyword.
+
+**2. Empty state has to be a separate condition.** You must write the length check yourself and keep it in sync with the loop's source. `@empty` is part of the loop and cannot drift from it.
+
+**3. `*ngSwitch` is four attributes that must agree.** Misspell `[ngSwitchCase]` and it silently renders nothing. `@switch`/`@case` are matched at parse time.
+
+**4. No fallthrough trap — but also no exhaustiveness.** Unlike JavaScript's `switch`, `@case` bodies can't fall into each other. `@default never` goes further: it emits `default: const tcbExhaustive1: never = <value>` into the template's type-check code, so forgetting a `Category` is a compile error. There is no legacy equivalent.
+
+**5. `trackBy` is optional, and its absence is silent.** With `@for`, omitting `track` is a **parse error**: `@for loop must have a "track" expression`. With `*ngFor`, forgetting `trackBy` compiles fine and just quietly hurts performance and focus retention.
+
+**6. You can put a `*` on exactly one element.** That's why legacy templates are littered with `<ng-container *ngIf>`, which exists solely to hold a structural directive without adding an element. `@if` has no such constraint.
+
+**7. Restricted in `track`, unconstrained in `*ngFor`.** Inside a `track` expression only the loop item and `$index` are available (plus component members) — `$first`/`$last`/`$even`/`$odd`/`$count` give `NG8009`, because tracking by position is the exact mistake `track` exists to prevent. `*ngFor`'s `let i = index` works inside the body with no such rule.
+
+### Translation checklist (`*ngIf`/`*ngFor` → `@if`/`@for`)
+
+1. `*ngIf="cond"` → `@if (cond) { }`.
+2. `*ngIf="cond; else tpl"` + `<ng-template #tpl>` → `@if (cond) { } @else { }` and delete the template.
+3. `*ngIf="expr as alias"` → `@if (expr; as alias)` — same alias, new syntax. Note it only works on `@if` and `@else if`.
+4. `*ngIf="a; else b"` chains → `@if (a) { } @else if (b) { }`.
+5. `*ngFor="let item of items"` → `@for (item of items; track …) { }`. The `let` is gone.
+6. Add a `track`. Prefer a stable id (`track e.id`). If there is genuinely no id, use `track $index` as an explicit acknowledgement that identity is positional — don't do this where rows contain focusable inputs.
+7. `trackBy: trackById` → delete the method; `track e.id` replaces it.
+8. `let i = index` → `; let i = $index`. Renamed for all six: `$index`, `$first`, `$last`, `$even`, `$odd`, `$count`. The `let` clause goes **after** `track`.
+9. `*ngFor="let item of items; let isFirst = first"` → `; let isFirst = $first`.
+10. Add an `@empty` block for the empty case and delete the separate `@if (items.length === 0)`.
+11. `[ngSwitch]` / `*ngSwitchCase` / `*ngSwitchDefault` → `@switch (x)` / `@case` / `@default`. Remember: **no fallthrough**.
+12. A getter used to avoid repeating a deep read → `@let x = theRead();` and delete the getter. `@let` is read-only (`NG8015` on assignment) and needs its semicolon.
+13. Delete now-unused `CommonModule` from `imports` — but only once nothing in the template still uses `ngClass`, `ngStyle`, `ngTemplateOutlet`, or a legacy pipe.
+14. Delete the `NgIf`/`NgForOf`/`NgSwitch`/`NgSwitchCase` imports if the component ever imported them directly.
+
+### Quick recognition patterns
+
+Structural-directive smell (when scanning a legacy codebase):
+- `*ngIf`, `*ngFor`, `*ngSwitch`, `*ngSwitchCase`, `*ngSwitchDefault` on elements
+- `<ng-container *ngIf>` and `<ng-container *ngFor>` — markers of the "one structural directive per element" constraint
+- `<ng-template #name>` paired with `*ngIf="…; else name"`
+- `trackBy: trackBySomething` in the template, with a matching method on the class
+- `let i = index; let f = first; let l = last` inside a `*ngFor`
+- `CommonModule` imported for `NgIf`/`NgForOf`/`NgSwitch`/`NgTemplateOutlet`
+- A separate "no items" block beside a list rather than inside it
+- `NgIf`, `NgForOf`, `NgSwitch` appearing in a component's `imports: []` array
+- Getter-heavy templates (`{{ expensiveThing().deeper }}` repeated) that predate `@let`
+
+Built-in-block smell (modern, stable since Angular 17):
+- `@if` / `@else if` / `@else` with the closing brace immediately after the keyword
+- `@for (item of items(); track item.id)`
+- `@empty` as the last branch of a `@for`
+- `@switch` / `@case` / `@default`
+- `@let` declarations at the top of a block
+- `imports` arrays that no longer mention `CommonModule`
 
 ## §8 — HttpClient + `toSignal` manual bridge
 
